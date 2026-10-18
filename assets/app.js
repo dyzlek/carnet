@@ -79,19 +79,166 @@
     rest.classList.remove('is-over'); renderRest();
   });
 
+  // --- Glisser-déposer des exercices (séance et programme) -----------------
+  // On maintient la poignée puis on glisse (doigt ou souris). Pendant le tri, les cartes se replient
+  // sur leur titre pour que toute la séance tienne sur un écran de téléphone, et la page défile seule
+  // près des bords. La poignée d'un superset déplace tout le groupe ; un exercice lâché entre deux
+  // exercices d'un même superset rejoint ce superset.
+  function sortable(list, { card, id, commit }) {
+    const cards = () => $$(card, list);
+    const groupOf = (c) => (c.dataset.ss ? parseInt(c.dataset.ss, 10) : null);
+    let drag = null;
+
+    // Cibles possibles : chaque exercice, ou chaque bloc (exercice seul / superset entier) si l'on déplace un groupe
+    function units() {
+      const others = cards().filter((c) => !drag.moving.includes(c));
+      const out = [];
+      others.forEach((c) => {
+        const g = groupOf(c), last = out.at(-1);
+        if (drag.group !== null && g !== null && last && last.g === g) last.els.push(c);
+        else out.push({ g, els: [c] });
+      });
+      return out.map((u) => {
+        const head = drag.group !== null && u.g !== null ? $(`[data-ss-head="${u.g}"]`, list) : null;
+        return { ...u, top: (head || u.els[0]).getBoundingClientRect().top, bottom: u.els.at(-1).getBoundingClientRect().bottom };
+      });
+    }
+
+    function update() {
+      const delta = drag.y + scrollY - drag.startY;
+      if (Math.abs(delta) > 4) drag.moved = true;
+      const dy = drag.fix + delta;
+      drag.moving.forEach((el) => (el.style.transform = `translateY(${dy}px)`));
+      // la place visée est celle du doigt (la ligne de dépose s'affiche sous le pouce)
+      const us = units();
+      let i = us.findIndex((u) => (u.top + u.bottom) / 2 > drag.y);
+      if (i < 0) i = us.length;
+      drag.units = us;
+      drag.index = i;
+      if (!us.length) return;
+      const y = i === 0 ? us[0].top - 5 : i === us.length ? us.at(-1).bottom + 5 : (us[i - 1].bottom + us[i].top) / 2;
+      drag.line.style.top = (y - list.getBoundingClientRect().top) + 'px';
+    }
+
+    function autoScroll() {
+      if (!drag) return;
+      const top = 70, bottom = innerHeight - 110; // marge pour la barre d'onglets mobile
+      const v = drag.y < top ? -(top - drag.y) / 5 : drag.y > bottom ? (drag.y - bottom) / 5 : 0;
+      if (v) { scrollBy(0, Math.round(v)); update(); }
+      drag.raf = requestAnimationFrame(autoScroll);
+    }
+
+    list.addEventListener('pointerdown', (e) => {
+      const handle = e.target.closest('[data-drag]');
+      if (!handle || drag || e.button > 0 || list.classList.contains('is-busy')) return;
+      e.preventDefault();
+      const head = handle.closest('[data-ss-head]');
+      const group = head ? parseInt(head.dataset.ssHead, 10) : null;
+      const origin = head || handle.closest(card);
+      const moving = head ? [head, ...cards().filter((c) => groupOf(c) === group)] : [origin];
+      // Repli des cartes : on garde la poignée sous le doigt
+      const grab = e.clientY - origin.getBoundingClientRect().top;
+      list.classList.add('is-sorting');
+      const box = origin.getBoundingClientRect();
+      const want = e.clientY - Math.min(grab, box.height / 2);
+      scrollBy(0, Math.round(box.top - want));
+      // si la page est trop courte pour défiler, on décale la carte pour qu'elle reste sous le doigt
+      const fix = want - origin.getBoundingClientRect().top;
+      handle.setPointerCapture?.(e.pointerId);
+      const line = document.createElement('div');
+      line.className = 'drop-line';
+      list.append(line);
+      moving.forEach((el) => el.classList.add('is-dragging'));
+      navigator.vibrate?.(10);
+      drag = { pid: e.pointerId, moving, group, line, fix, y: e.clientY, startY: e.clientY + scrollY, moved: false };
+      update();
+      autoScroll();
+    });
+
+    addEventListener('pointermove', (e) => {
+      if (!drag || e.pointerId !== drag.pid) return;
+      drag.y = e.clientY;
+      update();
+    });
+    addEventListener('pointerup', (e) => { if (drag && e.pointerId === drag.pid) drop(false); });
+    addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.pid) drop(true); });
+    addEventListener('keydown', (e) => { if (drag && e.key === 'Escape') drop(true); });
+
+    async function drop(cancel) {
+      const d = drag;
+      drag = null;
+      cancelAnimationFrame(d.raf);
+      d.line.remove();
+      d.moving.forEach((el) => { el.style.transform = ''; el.classList.remove('is-dragging'); });
+      const before = cards().map((c) => id(c) + ':' + groupOf(c)).join();
+      let order = null;
+      if (!cancel && d.moved && d.units) {
+        const flat = (us) => us.flatMap((u) => u.els);
+        const groups = new Map(cards().map((c) => [c, groupOf(c)]));
+        let seq;
+        if (d.group !== null) {
+          seq = [...flat(d.units.slice(0, d.index)), ...d.moving.slice(1), ...flat(d.units.slice(d.index))];
+        } else {
+          const x = d.moving[0], others = flat(d.units);
+          seq = [...others.slice(0, d.index), x, ...others.slice(d.index)];
+          const gx = groupOf(x), gp = groups.get(seq[d.index - 1]) ?? null, gn = groups.get(seq[d.index + 1]) ?? null;
+          // garde son superset s'il reste collé à un membre, rejoint celui dans lequel on le lâche, sinon devient seul
+          groups.set(x, gx !== null && (gp === gx || gn === gx) ? gx : gp !== null && gp === gn ? gp : null);
+        }
+        order = seq.map((c) => ({ id: id(c), g: groups.get(c) }));
+        if (order.map((o) => o.id + ':' + o.g).join() === before) order = null;
+      }
+      if (!order) { list.classList.remove('is-sorting'); return; }
+      list.classList.add('is-busy');
+      try { await commit(order, id(d.moving[d.group !== null ? 1 : 0])); }
+      catch (err) { alert(err.message); location.reload(); return; }
+      list.classList.remove('is-sorting', 'is-busy');
+    }
+  }
+
+  const tplRows = $('.tpl-rows');
+  if (tplRows) {
+    sortable(tplRows, {
+      card: '.tpl-row',
+      id: (c) => parseInt(c.dataset.id, 10),
+      commit: (order, moved) => new Promise(() => {
+        const form = tplRows.closest('form');
+        form.elements.order.value = JSON.stringify(order);
+        form.elements.moved.value = moved;
+        form.requestSubmit();
+      }),
+    });
+  }
+
   // --- Séries : enregistrement automatique ---------------------------------
   const exlist = $('.exlist');
-  const saveTimers = new Map();
+  const saveTimers = new Map(); // clé → [minuteur, envoi]
   function saveField(input) {
     const row = input.closest('.set-row');
     const key = row.dataset.set + input.name;
-    clearTimeout(saveTimers.get(key));
-    saveTimers.set(key, setTimeout(async () => {
+    const send = async () => {
       try {
         await api('set_update', { id: row.dataset.set, field: input.name, value: input.value });
         input.classList.remove('err');
       } catch (e) { input.classList.add('err'); console.error(e); }
-    }, 350));
+    };
+    clearTimeout(saveTimers.get(key)?.[0]);
+    saveTimers.set(key, [setTimeout(() => { saveTimers.delete(key); send(); }, 350), send]);
+  }
+  // Envoie tout de suite les saisies en attente (avant de recharger la liste)
+  async function flushSaves() {
+    const pending = [...saveTimers.values()];
+    saveTimers.clear();
+    pending.forEach(([t]) => clearTimeout(t));
+    await Promise.all(pending.map(([, send]) => send()));
+  }
+  // Recharge la liste des exercices sans recharger la page (minuteurs et défilement conservés)
+  async function refreshList() {
+    await flushSaves();
+    const html = await (await fetch(location.href)).text();
+    const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('.exlist');
+    if (fresh) exlist.innerHTML = fresh.innerHTML;
+    refreshTotals();
   }
 
   // Compteurs "séries / tonnes" en haut de la séance
@@ -108,11 +255,42 @@
   }
 
   if (exlist) {
+    sortable(exlist, {
+      card: '.excard',
+      id: (c) => parseInt(c.dataset.we, 10),
+      commit: async (order) => {
+        await flushSaves();
+        await api('workout_reorder', { workout: exlist.dataset.workout, order });
+        await refreshList();
+      },
+    });
+
     exlist.addEventListener('input', (e) => {
       if (e.target.matches('.set-in')) { saveField(e.target); refreshTotals(); }
     });
 
+    // Superset : après une série, on passe à l'exercice suivant du groupe (sans repos) ;
+    // après le dernier du groupe, repos puis retour au premier exercice qui a encore des séries à faire.
+    function supersetNext(card) {
+      const members = $$(`.excard[data-ss="${card.dataset.ss}"]`, exlist);
+      const i = members.indexOf(card);
+      const pending = (c) => $('.set-row[data-set]:not(.is-done)', c);
+      const next = members.slice(i + 1).find(pending) || (i === members.length - 1 ? members.find(pending) : null);
+      if (!next) return false;
+      const row = pending(next);
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return i < members.length - 1;
+    }
+
     exlist.addEventListener('click', async (e) => {
+      const joint = e.target.closest('[data-ss-toggle]');
+      if (joint) {
+        joint.disabled = true;
+        await api('workout_superset_toggle', { we: joint.dataset.ssToggle });
+        await refreshList();
+        return;
+      }
+
       const card = e.target.closest('.excard');
 
       // ✓ série faite : complète avec les valeurs proposées si vides, lance le repos
@@ -133,7 +311,11 @@
         refreshTotals();
         chk.setAttribute('aria-pressed', String(done));
         api('set_update', { id: row.dataset.set, field: 'done', value: done ? 1 : 0 });
-        if (done) startRest(parseInt(card.dataset.rest, 10) || 90);
+        if (done) {
+          // dans un superset, pas de repos avant d'avoir fait le tour du groupe
+          const chained = card.dataset.ss && supersetNext(card);
+          if (!chained) startRest(parseInt(card.dataset.rest, 10) || 90);
+        }
         return;
       }
 

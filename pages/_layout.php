@@ -4,12 +4,12 @@ $links = [
     'dashboard' => ['Accueil', 'home'],
     'workouts'  => ['Séances', 'log'],
     'activities' => ['Activités', 'act-run'],
-    'muscles'   => ['Muscles', 'target'],
-    'exercises' => ['Exercices', 'dumbbell'],
     'templates' => ['Programmes', 'clipboard'],
     'body'      => ['Corps', 'scale'],
 ];
-$navMap = ['workout' => 'workouts', 'start' => 'workouts', 'exercise' => 'exercises', 'template' => 'templates', 'activity' => 'activities'];
+// 5 onglets : Muscles s'ouvre depuis l'accueil, le catalogue d'exercices depuis Programmes
+$navMap = ['workout' => 'workouts', 'start' => 'workouts', 'muscles' => 'dashboard', 'exercises' => 'templates', 'exercise' => 'templates',
+           'template' => 'templates', 'activity' => 'activities'];
 $active = $navMap[$nav] ?? $nav;
 $me = current_user();
 $open = $me ? q('SELECT id, name, started_at FROM workouts WHERE ended_at IS NULL AND user_id = ? ORDER BY started_at DESC LIMIT 1', [$me['id']])->fetch() : null;
@@ -27,9 +27,9 @@ $msg = flash();
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <script src="assets/theme.js?v=1"></script>
 <link rel="stylesheet" href="assets/fonts.css?v=1">
-<link rel="stylesheet" href="assets/app.css?v=14">
+<link rel="stylesheet" href="assets/app.css?v=15">
 <script src="assets/vendor/chart.umd.min.js?v=4.4.1" defer></script>
-<script src="assets/app.js?v=9" defer></script>
+<script src="assets/app.js?v=10" defer></script>
 </head>
 <body class="page-<?= h($nav) ?><?= $bare ? ' is-bare' : '' ?>">
 <header class="topbar">

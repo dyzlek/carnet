@@ -17,6 +17,7 @@ require __DIR__ . '/helpers.php';
 require __DIR__ . '/db.php';
 require __DIR__ . '/programs.php';
 require __DIR__ . '/repo.php';
+require __DIR__ . '/supersets.php';
 require __DIR__ . '/activities.php';
 require __DIR__ . '/body_shapes.php';
 require __DIR__ . '/ui.php';

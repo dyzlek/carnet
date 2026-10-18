@@ -133,6 +133,7 @@ function seed_programs(PDO $pdo, int $uid): void
                 [$label, $ex, , $kind, $focus, $sets, $rmin, $rmax, $restMin, $restMax, $rpeMin, $rpeMax, $notes, $os, $or, $iMin, $iMax] = $r;
                 $ins->execute([$tid, $i + 1, $label, $ex, $kind, $focus, $sets, $rmin, $rmax, $restMin, $restMax, $rpeMin, $rpeMax, $notes, $os, $or, $iMin, $iMax]);
             }
+            ss_from_labels('template', $tid);
         }
         $pdo->commit();
         $done[] = $p['name'];

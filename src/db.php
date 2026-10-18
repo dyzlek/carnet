@@ -128,6 +128,7 @@ function migrate(PDO $pdo): void
     add_columns($pdo, 'template_exercises', ['focus' => 'TEXT', 'rpe_min' => 'REAL', 'rpe_max' => 'REAL']);
     if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 1) migrate_v1($pdo);
     if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 2) migrate_v2($pdo);
+    if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 3) migrate_v3($pdo);
 }
 
 /** Importe le dataset hasaneyldrm/exercises-dataset (data/exercises.json). */
@@ -269,5 +270,17 @@ function migrate_v2(PDO $pdo): void
     CREATE INDEX IF NOT EXISTS idx_activities_user ON activities(user_id, started_at);
     PRAGMA user_version = 2;
     SQL);
+    $pdo->commit();
+}
+
+/** v3 : supersets stockés dans superset_group (avant : déduits du libellé « 2A / 2B »). */
+function migrate_v3(PDO $pdo): void
+{
+    $pdo->beginTransaction();
+    add_columns($pdo, 'template_exercises', ['superset_group' => 'INTEGER']);
+    add_columns($pdo, 'workout_exercises', ['superset_group' => 'INTEGER']);
+    foreach ($pdo->query('SELECT id FROM templates')->fetchAll(PDO::FETCH_COLUMN) as $id) ss_from_labels('template', (int)$id);
+    foreach ($pdo->query('SELECT id FROM workouts')->fetchAll(PDO::FETCH_COLUMN) as $id) ss_from_labels('workout', (int)$id);
+    $pdo->exec('PRAGMA user_version = 3');
     $pdo->commit();
 }

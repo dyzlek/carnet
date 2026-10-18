@@ -42,7 +42,7 @@ if (is_post()) {
 
 $title = $w['name'];
 $finished = $w['ended_at'] !== null;
-$wes = q('SELECT we.id AS we_id, we.exercise_id, we.label, we.template_exercise_id,
+$wes = q('SELECT we.id AS we_id, we.exercise_id, we.label, we.superset_group, we.template_exercise_id,
                  e.name, e.name_fr, e.image, e.equipment,
                  te.kind, te.focus, te.rpe_min, te.rpe_max, te.sets AS t_sets, te.reps_min, te.reps_max, te.rest_min, te.rest_max, te.notes AS t_notes,
                  te.overload_sets, te.overload_reps, te.inc_min, te.inc_max
@@ -84,7 +84,6 @@ $prs = $finished ? workout_prs($w) : [];
 
 <div class="exlist" data-workout="<?= $id ?>">
 <?php
-$prevGroup = null;
 foreach ($wes as $idx => $we):
     $sets = q('SELECT * FROM sets WHERE workout_exercise_id = ? ORDER BY set_number', [$we['we_id']])->fetchAll();
     $last = last_performance($we['exercise_id'], $w['started_at']);
@@ -93,13 +92,21 @@ foreach ($wes as $idx => $we):
     $muscles = exercise_muscles($we['exercise_id']);
     $rest = $we['rest_max'] !== null ? (int)$we['rest_max'] : 90;
     if ($rest === 0) $rest = 15;
-    $group = $we['label'] && preg_match('/^(\d+)[A-Z]$/i', $we['label'], $m) ? $m[1] : null;
+    $group = $we['superset_group'];
     $isSuper = $group !== null;
-    $nextGroup = isset($wes[$idx + 1]['label']) && preg_match('/^(\d+)[A-Z]$/i', (string)$wes[$idx + 1]['label'], $m2) ? $m2[1] : null;
+    $prevGroup = $wes[$idx - 1]['superset_group'] ?? null;
+    $nextGroup = $wes[$idx + 1]['superset_group'] ?? null;
+    $ssFirst = $isSuper && $group !== $prevGroup;
 ?>
-  <article class="excard<?= $isSuper ? ' in-superset' : '' ?><?= $isSuper && $group !== $prevGroup ? ' ss-first' : '' ?><?= $isSuper && $nextGroup !== $group ? ' ss-last' : '' ?>"
-           data-we="<?= (int)$we['we_id'] ?>" data-rest="<?= $rest ?>">
+  <?php if ($ssFirst):
+      $members = array_values(array_filter($wes, fn($x) => $x['superset_group'] === $group));
+      $rounds = (int)q('SELECT MAX(n) FROM (SELECT COUNT(*) AS n FROM sets WHERE workout_exercise_id IN (' . implode(',', array_map(fn($x) => (int)$x['we_id'], $members)) . ') GROUP BY workout_exercise_id)')->fetchColumn(); ?>
+    <p class="ss-head" data-ss-head="<?= (int)$group ?>"><?= drag_handle('Déplacer le superset') ?><?= icon('link') ?><?= h(ss_title(count($members), $rounds)) ?><span class="muted">enchaîner sans repos, repos après le tour</span></p>
+  <?php endif; ?>
+  <article class="excard<?= $isSuper ? ' in-superset' : '' ?><?= $ssFirst ? ' ss-first' : '' ?><?= $isSuper && $nextGroup !== $group ? ' ss-last' : '' ?>"
+           data-we="<?= (int)$we['we_id'] ?>" data-rest="<?= $rest ?>"<?= $isSuper ? ' data-ss="' . (int)$group . '"' : '' ?>>
     <header class="excard-head">
+      <?= drag_handle("Déplacer l'exercice") ?>
       <?php if ($we['label']): ?><span class="badge"><?= h($we['label']) ?></span><?php endif; ?>
       <span class="excard-thumb"><?= thumb_zoom($we, $we['exercise_id']) ?></span>
       <div class="excard-title">
@@ -154,7 +161,8 @@ foreach ($wes as $idx => $we):
     </div>
     <button type="button" class="btn ghost sm add-set"><?= icon('plus') ?>Série</button>
   </article>
-<?php $prevGroup = $group; endforeach; ?>
+  <?php if (isset($wes[$idx + 1])) echo ss_joint($isSuper && $group === $nextGroup, 'data-ss-toggle="' . (int)$we['we_id'] . '"'); ?>
+<?php endforeach; ?>
 </div>
 
 <button type="button" class="btn ghost block" data-pick="workout" data-id="<?= $id ?>"><?= icon('plus') ?>Ajouter un exercice</button>

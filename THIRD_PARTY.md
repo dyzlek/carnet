@@ -31,7 +31,7 @@ SOFTWARE.```
 
 [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset), licence MIT ; images et GIF © Gym visual.
 
-## Icônes d'activités (src/ui.php, clés act-*, route, flame, clock)
+## Icônes d'activités et de superset (src/ui.php, clés act-*, route, flame, clock, link, unlink)
 
 Tracés repris de [Tabler Icons](https://github.com/tabler/tabler-icons) v3.19.0.
 

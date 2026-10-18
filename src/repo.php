@@ -127,8 +127,8 @@ function start_workout(?int $templateId): int
 
     if ($tpl) {
         foreach (template_exercises((int)$tpl['id']) as $i => $te) {
-            q('INSERT INTO workout_exercises (workout_id, exercise_id, template_exercise_id, position, label) VALUES (?,?,?,?,?)',
-                [$wid, $te['exercise_id'], $te['id'], $i + 1, $te['label']]);
+            q('INSERT INTO workout_exercises (workout_id, exercise_id, template_exercise_id, position, label, superset_group) VALUES (?,?,?,?,?,?)',
+                [$wid, $te['exercise_id'], $te['id'], $i + 1, $te['label'], $te['superset_group']]);
             $weId = (int)$pdo->lastInsertId();
             $last = last_performance($te['exercise_id'], $start);
             $status = overload_status($te, $last);
@@ -143,6 +143,7 @@ function start_workout(?int $templateId): int
                 q('INSERT INTO sets (workout_exercise_id, set_number, weight) VALUES (?,?,?)', [$weId, $n, $weight]);
             }
         }
+        ss_renumber('workout', $wid);
     }
     $pdo->commit();
     return $wid;
@@ -156,6 +157,7 @@ function add_exercise_to_workout(int $workoutId, string $exerciseId): int
     $pos = (int)q('SELECT COALESCE(MAX(position), 0) FROM workout_exercises WHERE workout_id = ?', [$workoutId])->fetchColumn();
     q('INSERT INTO workout_exercises (workout_id, exercise_id, position) VALUES (?,?,?)', [$workoutId, $exerciseId, $pos + 1]);
     $weId = (int)db()->lastInsertId();
+    ss_renumber('workout', $workoutId);
     $last = last_performance($exerciseId, $w['started_at']);
     $n = $last ? count($last['sets']) : 3;
     for ($i = 1; $i <= $n; $i++) {
