@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🟨 Carnet
+# Carnet
 
 **Carnet d'entraînement de musculation, auto-hébergé.**
 Séances, surcharge progressive, muscles travaillés, activités cardio, poids et mensurations.
@@ -21,20 +21,20 @@ Séances, surcharge progressive, muscles travaillés, activités cardio, poids e
 PHP natif + SQLite, sans framework, sans Composer, sans build : on copie le dossier sur un serveur et ça tourne.
 Thème sombre (encre) et clair (papier), interface pensée pour le téléphone à la salle.
 
-## ✨ Fonctions
+## Fonctions
 
-| | |
+| Module | Description |
 |---|---|
-| 🏋️ **Séance en cours** | Charges pré-remplies depuis la dernière séance, colonne « Préc. », ✓ qui remplit les reps et lance le minuteur de repos (bip + vibration), supersets 2A/2B, enregistrement automatique. |
-| 📈 **Surcharge progressive** | Règle par exercice (ex. « 4×12 validées → +5 kg ») : la séance suivante propose et pré-remplit la nouvelle charge. |
-| 🫀 **Muscles** | Séries par muscle sur 7 / 14 / 30 / 90 jours (principal = 1, secondaire = ½), silhouette colorée, comparaison avec la période précédente, zones 10–20 séries/semaine. |
-| 📚 **1 324 exercices** | Recherche, filtres muscle/matériel, GIF, consignes en français, records (charge max, 1RM estimé, volume), courbe de progression, exercices perso. |
-| 🗂️ **Programmes** | Création et modification : ordre, type, séries, reps, repos, consigne, règle de surcharge. Jambes, Dos & Biceps et Push fournis. |
-| 🚴 **Activités** | 15 sports (course, vélo, rameur, natation…), allure / vitesse selon le sport, calories estimées (MET × poids), objectif OMS 150 min/semaine. |
-| ⚖️ **Corps** | Pesées (moyenne 7 j, objectif, IMC), 12 mensurations avec courbes. |
-| 👥 **Multi-comptes** | Données cloisonnées par compte, catalogue commun géré par l'admin, export JSON, suppression du compte. |
+| **Séance en cours** | Charges pré-remplies depuis la dernière séance, colonne « Préc. », coche qui remplit les reps et lance le minuteur de repos (bip + vibration), supersets 2A/2B, enregistrement automatique. |
+| **Surcharge progressive** | Règle par exercice (ex. « 4×12 validées → +5 kg ») : la séance suivante propose et pré-remplit la nouvelle charge. |
+| **Muscles** | Séries par muscle sur 7 / 14 / 30 / 90 jours (principal = 1, secondaire = ½), silhouette colorée, comparaison avec la période précédente, zones 10–20 séries/semaine. |
+| **1 324 exercices** | Recherche, filtres muscle/matériel, GIF, consignes en français, records (charge max, 1RM estimé, volume), courbe de progression, exercices perso. |
+| **Programmes** | Création et modification : ordre, type, séries, reps, repos, consigne, règle de surcharge. Jambes, Dos & Biceps et Push fournis. |
+| **Activités** | 15 sports (course, vélo, rameur, natation…), allure / vitesse selon le sport, calories estimées (MET × poids), objectif OMS 150 min/semaine. |
+| **Corps** | Pesées (moyenne 7 j, objectif, IMC), 12 mensurations avec courbes. |
+| **Multi-comptes** | Données cloisonnées par compte, catalogue commun géré par l'admin, export JSON, suppression du compte. |
 
-## 📸 Aperçu
+## Aperçu
 
 <table>
   <tr>
@@ -69,7 +69,7 @@ Thème sombre (encre) et clair (papier), interface pensée pour le téléphone �
 
 <p align="center"><sub>Captures réalisées avec des données de démonstration.</sub></p>
 
-## 🚀 Lancer en local
+## Lancer en local
 
 Prérequis : **PHP 8.1+** avec `pdo_sqlite`.
 
@@ -89,13 +89,13 @@ Le **premier compte créé devient administrateur** ; les inscriptions sont ensu
 > L'option `-d extension=pdo_sqlite` active SQLite au lancement sans toucher au `php.ini`.
 > Les images et GIF des exercices sont chargés depuis GitHub : il faut une connexion.
 
-## 🌐 Mettre en ligne
+## Mettre en ligne
 
 Apache ou nginx, PHP 8.1+, HTTPS. Tout est détaillé dans **[DEPLOIEMENT.md](DEPLOIEMENT.md)** :
 paquet prêt à envoyer (`tools/build.php`), droits sur `data/`, configuration nginx,
 et script de vérification `tools/check.php` qui teste le site depuis l'extérieur.
 
-## 🔒 Sécurité
+## Sécurité
 
 - Mots de passe hachés (`password_hash`), jeton CSRF sur chaque formulaire et appel API
 - Session renouvelée à la connexion, blocage après 8 essais ratés en 15 min
@@ -103,7 +103,7 @@ et script de vérification `tools/check.php` qui teste le site depuis l'extérie
 - `data/`, `src/`, `pages/`, `tools/` inaccessibles depuis le web (`.htaccess` + `router.php`)
 - Chart.js et polices hébergés localement (vérifiés par SRI) : aucun script chargé depuis un CDN
 
-## 🗂️ Structure
+## Structure
 
 ```
 index.php        routeur des pages (?p=…)
@@ -116,7 +116,7 @@ data/            exercises.json (+ muscu.sqlite, sessions/ créés au lancement)
 tools/           build.php, check.php, reset-password.php
 ```
 
-## 🙏 Crédits
+## Crédits
 
 - Exercices : [hasaneyldrm/exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) (MIT), images et GIF © Gym visual
 - Silhouette anatomique : [react-body-highlighter](https://github.com/GV79/react-body-highlighter) (MIT)
@@ -125,6 +125,6 @@ tools/           build.php, check.php, reset-password.php
 
 Détails et licences complètes dans [THIRD_PARTY.md](THIRD_PARTY.md).
 
-## 📄 Licence
+## Licence
 
 [MIT](LICENSE) © dyzlek
