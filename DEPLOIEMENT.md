@@ -21,6 +21,8 @@ Si le site affiche « L'extension PHP pdo_sqlite n'est pas disponible sur ce ser
    (colonne de gauche), `DB_USER` / `DB_PASS` = tes identifiants MySQL.
    Écris le mot de passe **uniquement dans ce fichier sur le serveur** : il n'est jamais envoyé sur GitHub.
 3. Ouvre le site : les tables sont créées automatiquement dans ta base et les 1 324 exercices importés (quelques secondes).
+   Elles s'appellent toutes `carnet_…` (`carnet_users`, `carnet_sets`…) : Carnet peut partager la base avec d'autres
+   projets (WordPress, PrestaShop…) sans toucher à leurs tables. Préfixe modifiable avec `DB_PREFIX` dans `config.php`.
    Le dossier `data/` doit rester accessible en écriture (sessions de connexion).
 4. Crée ton compte (étape 3).
 

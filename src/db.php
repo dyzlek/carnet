@@ -6,9 +6,9 @@ function db(): PDO
     if ($pdo) return $pdo;
 
     if (is_mysql()) {
-        if (!extension_loaded('pdo_mysql')) db_fail("L'extension PHP pdo_mysql n'est pas chargée sur ce serveur.");
+        if (!pdo_driver('mysql')) db_fail("L'extension PHP pdo_mysql n'est pas chargée sur ce serveur.");
         try {
-            $pdo = new PDO('mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS, [
+            $pdo = new PrefixedPDO('mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS, [
                 PDO::ATTR_EMULATE_PREPARES => false,  // entiers et décimaux renvoyés en nombres, comme avec SQLite
                 PDO::ATTR_STRINGIFY_FETCHES => false,
             ]);
@@ -25,7 +25,7 @@ function db(): PDO
         return $pdo;
     }
 
-    if (!extension_loaded('pdo_sqlite')) {
+    if (!pdo_driver('sqlite')) {
         db_fail(PHP_SAPI === 'cli-server'
             ? "L'extension PHP pdo_sqlite n'est pas chargée. Lance l'app avec start.bat (ou : php -d extension=pdo_sqlite -S localhost:8000 router.php)."
             : "L'extension PHP pdo_sqlite n'est pas disponible sur ce serveur. Utilise une base MySQL : copie config.example.php en config.php et remplis-le (voir DEPLOIEMENT.md).");
@@ -40,6 +40,49 @@ function db(): PDO
 
     migrate($pdo);
     return $pdo;
+}
+
+/**
+ * MySQL : la base peut être partagée avec d'autres projets (WordPress, PrestaShop… sur le serveur de l'IUT).
+ * Toutes les tables de Carnet portent donc le préfixe DB_PREFIX (« carnet_ » par défaut) : il est ajouté
+ * automatiquement après FROM / JOIN / INTO / UPDATE / TABLE / REFERENCES, sans toucher aux colonnes
+ * (template_exercises.sets) ni aux alias (AS workouts).
+ */
+final class PrefixedPDO extends PDO
+{
+    private const TABLES = 'users|settings|user_settings|login_attempts|exercises|exercise_muscles|exercise_notes|templates|'
+        . 'template_exercises|workouts|workout_exercises|sets|bodyweight|measurements|activities';
+
+    public static function prefix(string $sql): string
+    {
+        if (DB_PREFIX === '') return $sql;
+        return preg_replace('/\b(FROM|JOIN|INTO|UPDATE|REFERENCES|TABLE(?:\s+IF\s+NOT\s+EXISTS)?)(\s+)`?(' . self::TABLES . ')`?(?![\w.])/i',
+            '$1$2' . DB_PREFIX . '$3', $sql);
+    }
+
+    public function prepare(string $query, array $options = []): PDOStatement|false
+    {
+        return parent::prepare(self::prefix($query), $options);
+    }
+
+    public function query(string $query, ?int $fetchMode = null, mixed ...$fetchModeArgs): PDOStatement|false
+    {
+        return $fetchMode === null ? parent::query(self::prefix($query)) : parent::query(self::prefix($query), $fetchMode, ...$fetchModeArgs);
+    }
+
+    public function exec(string $statement): int|false
+    {
+        return parent::exec(self::prefix($statement));
+    }
+}
+
+/**
+ * Pilote PDO disponible ? (et non extension_loaded() : OPcache peut figer son résultat à la compilation,
+ * et sous Windows le cache est partagé entre les serveurs PHP lancés avec des extensions différentes)
+ */
+function pdo_driver(string $name): bool
+{
+    return class_exists('PDO') && in_array($name, PDO::getAvailableDrivers(), true);
 }
 
 function is_mysql(): bool
@@ -361,7 +404,7 @@ function migrate_v4(PDO $pdo): void
  */
 function migrate_mysql(PDO $pdo): void
 {
-    if (!$pdo->query("SHOW TABLES LIKE 'settings'")->fetchColumn()) {
+    if (!$pdo->query("SHOW TABLES LIKE '" . DB_PREFIX . "settings'")->fetchColumn()) {
         $opts = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
         $tables = [
             "CREATE TABLE users (
