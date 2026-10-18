@@ -7,7 +7,7 @@ comptes et données cloisonnés, en-têtes de sécurité présents.
 
 - PHP **8.1 ou plus** avec `pdo_sqlite` (présent chez quasiment tous les hébergeurs).
 - Apache 2.4 (les `.htaccess` fournis protègent tout) **ou** nginx (voir plus bas).
-- **HTTPS** (Let's Encrypt, gratuit chez la plupart des hébergeurs). Sans HTTPS, les mots de passe passent en clair.
+- **HTTPS** (Let's Encrypt, gratuit chez la plupart des hébergeurs). Sans HTTPS, les mots de passe passent en clair. HTTPS est aussi requis pour installer l'app sur le téléphone et l'utiliser hors ligne.
 
 ## 1. Préparer le paquet (sur ton PC)
 
@@ -61,6 +61,8 @@ location ~ ^/(data|src|pages|tools|dist|\.claude)(/|$) { deny all; return 404; }
 location ~ /\.(?!well-known/) { deny all; return 404; }
 location ~ \.(md|bat|sh|sqlite|sqlite-wal|sqlite-shm|log|ini)$ { deny all; return 404; }
 location = /router.php { deny all; return 404; }
+# Service worker (app installable / hors ligne) : toujours revalidé
+location = /sw.js { add_header Cache-Control "no-cache"; }
 
 location ~ \.php$ {
     include fastcgi_params;

@@ -80,6 +80,29 @@ try {
                 'used' => (int)$e['used'],
             ], $rows));
 
+        case 'replace_suggestions':
+            // Alternatives pour « Remplacer » (machine occupée) : mêmes muscles, puis même matériel
+            $we = need(owned_workout_exercise((int)($_GET['we'] ?? 0)));
+            json_out(array_map(fn($e) => [
+                'id' => $e['id'],
+                'name' => ex_name($e),
+                'sub' => equipment_label($e['equipment']) . ' · ' . muscles_text(exercise_muscles($e['id'])['primary']),
+                'img' => media_url($e['image']),
+                'used' => (int)$e['used'],
+            ], replacement_candidates($we['exercise_id'], (string)($_GET['q'] ?? ''))));
+
+        case 'workout_replace_exercise':
+            $we = need(owned_workout_exercise((int)($in['we'] ?? 0)));
+            need(exercise((string)($in['exercise'] ?? '')));
+            replace_workout_exercise($we, (string)$in['exercise'], !empty($in['template']));
+            json_out(['ok' => true]);
+
+        case 'exercise_note':
+            // Réglages machine : propres à l'utilisateur, affichés à chaque séance
+            $ex = need(exercise((string)($in['exercise'] ?? '')));
+            save_exercise_note($ex['id'], (string)($in['note'] ?? ''));
+            json_out(['ok' => true]);
+
         case 'workout_add_exercise':
             need(owned_workout((int)($in['workout'] ?? 0)));
             need(exercise((string)($in['exercise'] ?? '')));

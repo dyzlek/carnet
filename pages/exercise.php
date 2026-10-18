@@ -51,6 +51,10 @@ $chron = array_reverse($history);
       <?php foreach ($muscles['primary'] as $m): ?><span class="chip strong"><?= h(muscle_label($m)) ?></span><?php endforeach; ?>
       <?php foreach ($muscles['secondary'] as $m): ?><span class="chip"><?= h(muscle_label($m)) ?> ½</span><?php endforeach; ?>
     </div>
+    <label class="ex-note">
+      <span><?= icon('wrench') ?>Mes réglages</span>
+      <input data-ex-note="<?= h($e['id']) ?>" value="<?= h(exercise_note($e['id'])) ?>" placeholder="Siège cran 4, dossier 2…" maxlength="300" autocomplete="off" enterkeyhint="done">
+    </label>
     <?php if (can_edit_exercise($e)): ?>
     <form method="post" class="inline-form">
       <input type="hidden" name="action" value="rename">

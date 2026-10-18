@@ -25,11 +25,13 @@ Thème sombre (encre) et clair (papier), interface pensée pour le téléphone �
 
 | Module | Description |
 |---|---|
-| **Séance en cours** | Charges pré-remplies depuis la dernière séance, colonne « Préc. », coche qui remplit les reps et lance le minuteur de repos (bip + vibration), supersets 2A/2B, enregistrement automatique. |
+| **Séance en cours** | Charges pré-remplies depuis la dernière séance, colonne « Préc. », coche qui remplit les reps et lance le minuteur de repos (bip + vibration), repos de transition annonçant l'exercice suivant, minuteur qui survit au rechargement, enregistrement automatique. |
+| **Supersets et ordre** | Lier / délier en un clic (bi-set, tri-set, circuit), enchaînement sans repos ; exercices réordonnés au glisser-déposer, au doigt sur mobile. |
+| **À la salle** | Remplacer un exercice quand la machine est prise (alternatives sur les mêmes muscles), notes de réglage machine, écran toujours allumé, application installable, saisies hors ligne synchronisées au retour du réseau. |
 | **Surcharge progressive** | Règle par exercice (ex. « 4×12 validées → +5 kg ») : la séance suivante propose et pré-remplit la nouvelle charge. |
 | **Muscles** | Séries par muscle sur 7 / 14 / 30 / 90 jours (principal = 1, secondaire = ½), silhouette colorée, comparaison avec la période précédente, zones 10–20 séries/semaine. |
 | **1 324 exercices** | Recherche, filtres muscle/matériel, GIF, consignes en français, records (charge max, 1RM estimé, volume), courbe de progression, exercices perso. |
-| **Programmes** | Création et modification : ordre, type, séries, reps, repos, consigne, règle de surcharge. Jambes, Dos & Biceps et Push fournis. |
+| **Programmes** | Création et modification : ordre, type, séries, reps, repos (entre séries et après l'exercice, en `1:30` ou en secondes), consigne, règle de surcharge. Jambes, Dos & Biceps et Push fournis. |
 | **Activités** | 15 sports (course, vélo, rameur, natation…), allure / vitesse selon le sport, calories estimées (MET × poids), objectif OMS 150 min/semaine. |
 | **Corps** | Pesées (moyenne 7 j, objectif, IMC), 12 mensurations avec courbes. |
 | **Multi-comptes** | Données cloisonnées par compte, catalogue commun géré par l'admin, export JSON, suppression du compte. |

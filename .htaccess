@@ -30,3 +30,9 @@ AddDefaultCharset utf-8
 <IfModule mod_mime.c>
   AddType font/woff2 .woff2
 </IfModule>
+# Service worker : toujours revalidé, sinon une mise à jour de l'app peut mettre des jours à arriver
+<IfModule mod_headers.c>
+  <Files "sw.js">
+    Header set Cache-Control "no-cache"
+  </Files>
+</IfModule>
