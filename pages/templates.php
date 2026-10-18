@@ -18,6 +18,7 @@ $templates = q('SELECT t.*, (SELECT MAX(started_at) FROM workouts w WHERE w.temp
     <button class="btn"><?= icon('plus') ?>Créer</button>
   </form>
 </div>
+<p class="tpl-catalog"><a class="btn ghost sm" href="?p=exercises"><?= icon('dumbbell') ?>Catalogue d'exercices</a></p>
 
 <?php if (!$templates): ?><p class="empty">Aucun programme.</p><?php endif; ?>
 

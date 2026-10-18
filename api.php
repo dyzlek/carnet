@@ -89,17 +89,24 @@ try {
         case 'workout_remove_exercise':
             $we = need(owned_workout_exercise((int)($in['we'] ?? 0)));
             q('DELETE FROM workout_exercises WHERE id = ?', [$we['id']]);
+            ss_renumber('workout', (int)$we['workout_id']);
             json_out(['ok' => true]);
 
         case 'workout_move_exercise':
             $we = need(owned_workout_exercise((int)($in['we'] ?? 0)));
-            $all = q('SELECT id FROM workout_exercises WHERE workout_id = ? ORDER BY position, id', [$we['workout_id']])->fetchAll(PDO::FETCH_COLUMN);
-            $i = array_search($we['id'], $all);
-            $j = $i + ((int)($in['dir'] ?? 1) < 0 ? -1 : 1);
-            if ($j >= 0 && $j < count($all)) {
-                [$all[$i], $all[$j]] = [$all[$j], $all[$i]];
-                foreach ($all as $pos => $id) q('UPDATE workout_exercises SET position = ? WHERE id = ?', [$pos + 1, $id]);
-            }
+            ss_move('workout', (int)$we['workout_id'], (int)$we['id'], (int)($in['dir'] ?? 1) < 0 ? -1 : 1);
+            json_out(['ok' => true]);
+
+        case 'workout_reorder':
+            // Nouvel ordre après un glisser-déposer
+            $w = need(owned_workout((int)($in['workout'] ?? 0)));
+            if (!ss_reorder('workout', (int)$w['id'], (array)($in['order'] ?? []))) json_out(['error' => 'Ordre invalide, recharge la page.'], 400);
+            json_out(['ok' => true]);
+
+        case 'workout_superset_toggle':
+            // Lie l'exercice au suivant en superset, ou coupe le groupe à cet endroit
+            $we = need(owned_workout_exercise((int)($in['we'] ?? 0)));
+            ss_toggle('workout', (int)$we['workout_id'], (int)$we['id']);
             json_out(['ok' => true]);
 
         case 'workout_notes':
@@ -113,6 +120,7 @@ try {
             $pos = (int)q('SELECT COALESCE(MAX(position), 0) FROM template_exercises WHERE template_id = ?', [$t['id']])->fetchColumn();
             q('INSERT INTO template_exercises (template_id, position, label, exercise_id, kind, sets, reps_min, reps_max, rest_min, rest_max)
                VALUES (?,?,?,?,?,?,?,?,?,?)', [$t['id'], $pos + 1, (string)($pos + 1), $ex['id'], 'Exercice', 3, 8, 12, 90, 90]);
+            ss_renumber('template', (int)$t['id']);
             json_out(['ok' => true]);
 
         case 'export':

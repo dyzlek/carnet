@@ -13,6 +13,9 @@ const ICONS = [
     'check' => 'M5 12.5l4.5 4.5L19 7.5',
     'x' => 'M6 6l12 12M18 6 6 18',
     'more' => 'M5 12h.01M12 12h.01M19 12h.01',
+    'grip' => 'M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01',
+    'link' => 'M9 15l6-6M11 6l.46-.54a5 5 0 0 1 7.08 7.08l-.54.46M13 18l-.4.53a5.07 5.07 0 0 1-7.12 0 4.97 4.97 0 0 1 0-7.07l.52-.46',
+    'unlink' => 'M17 22v-2M9 15l6-6M11 6l.46-.54a5 5 0 0 1 7.08 7.08l-.54.46M13 18l-.4.53a5.07 5.07 0 0 1-7.12 0 4.97 4.97 0 0 1 0-7.07l.52-.46M20 17h2M2 7h2M7 2v2',
     'arrow-right' => 'M5 12h14M13 6l6 6-6 6',
     'arrow-left' => 'M19 12H5M11 6l-6 6 6 6',
     'arrow-up' => 'M12 19V5M6 11l6-6 6 6',
@@ -56,6 +59,24 @@ function icon(string $name, string $class = 'icon'): string
 {
     $d = ICONS[$name] ?? '';
     return '<svg class="' . $class . '" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="' . $d . '"/></svg>';
+}
+
+/**
+ * Jonction entre deux exercices consécutifs : « Lier en superset » ou « Délier ».
+ * $attrs porte la cible (data-ss-toggle en séance, name/value du formulaire dans un programme).
+ */
+function ss_joint(bool $linked, string $attrs): string
+{
+    $type = str_contains($attrs, 'name=') ? 'submit' : 'button';
+    return '<div class="ss-joint' . ($linked ? ' is-linked' : '') . '">'
+        . '<button type="' . $type . '" class="ss-btn" ' . $attrs . '>'
+        . icon($linked ? 'unlink' : 'link') . ($linked ? 'Délier' : 'Lier en superset') . '</button></div>';
+}
+
+/** Poignée de glisser-déposer (gérée par sortable() dans app.js). */
+function drag_handle(string $label): string
+{
+    return '<button type="button" class="drag-handle" data-drag aria-label="' . h($label) . '" title="' . h($label) . '">' . icon('grip') . '</button>';
 }
 
 /** Lien "Voir plus" avec flèche. */

@@ -22,17 +22,23 @@ if (is_post()) {
                 q('DELETE FROM template_exercises WHERE id = ? AND template_id = ?', [(int)$rid, $id]);
                 continue;
             }
-            q('UPDATE template_exercises SET position = ?, label = ?, kind = ?, focus = ?, sets = ?, reps_min = ?, reps_max = ?, rest_min = ?, rest_max = ?, rpe_min = ?, rpe_max = ?,
+            q('UPDATE template_exercises SET kind = ?, focus = ?, sets = ?, reps_min = ?, reps_max = ?, rest_min = ?, rest_max = ?, rpe_min = ?, rpe_max = ?,
                       notes = ?, overload_sets = ?, overload_reps = ?, inc_min = ?, inc_max = ?
                WHERE id = ? AND template_id = ?', [
-                $int($r['position']) ?? 0, trim((string)$r['label']), trim((string)$r['kind']) ?: null, trim((string)($r['focus'] ?? '')) ?: null,
+                trim((string)$r['kind']) ?: null, trim((string)($r['focus'] ?? '')) ?: null,
                 max(1, $int($r['sets']) ?? 3), $int($r['reps_min']), $int($r['reps_max']),
                 $int($r['rest_min']), $int($r['rest_max']), parse_num($r['rpe_min'] ?? null), parse_num($r['rpe_max'] ?? null), trim((string)$r['notes']) ?: null,
                 $int($r['overload_sets']), $int($r['overload_reps']), parse_num($r['inc_min']), parse_num($r['inc_max']),
                 (int)$rid, $id,
             ]);
         }
-        flash('Programme enregistré.');
+        // Glisser-déposer ou bouton de jonction : on enregistre d'abord le formulaire, puis l'ordre / le superset
+        $order = json_decode((string)($_POST['order'] ?? ''), true);
+        if (!is_array($order) || !ss_reorder('template', $id, $order)) ss_renumber('template', $id);
+        $focus = (int)(($_POST['moved'] ?? '') ?: ($_POST['ss_toggle'] ?? 0));
+        if (isset($_POST['ss_toggle'])) ss_toggle('template', $id, $focus);
+        if (!$focus) flash('Programme enregistré.');
+        redirect("?p=template&id=$id" . ($focus ? "#ex-$focus" : ''));
     }
     redirect("?p=template&id=$id");
 }
@@ -43,20 +49,32 @@ $rows = template_exercises($id);
 <a class="back" href="?p=templates"><?= icon('arrow-left') ?>Programmes</a>
 <form method="post" class="tpl-form">
   <input type="hidden" name="action" value="save">
+  <input type="hidden" name="order" value="">
+  <input type="hidden" name="moved" value="">
+  <button class="sr-only" tabindex="-1" aria-hidden="true">Enregistrer</button><?php /* bouton par défaut : Entrée enregistre, ne lie pas un superset */ ?>
   <div class="form-grid two">
     <label>Nom <input name="name" value="<?= h($t['name']) ?>" required></label>
     <label>Description <input name="notes" value="<?= h($t['notes']) ?>"></label>
   </div>
 
-  <p class="muted small">Ordre « 2A / 2B » = superset. Repos en secondes (« 0 à 15 s » : min 0, max 15). Surcharge : si <i>N</i> séries à <i>X</i> reps sont validées à la charge max, l'app propose +min à +max kg à la séance suivante.</p>
+  <p class="muted small">Ordre : maintiens la poignée à gauche d'un exercice et fais-le glisser (celle d'un superset déplace tout le groupe). Superset : bouton « Lier en superset » entre deux exercices (2A / 2B, tri-set, circuit). Repos en secondes (« 0 à 15 s » : min 0, max 15). Surcharge : si <i>N</i> séries à <i>X</i> reps sont validées à la charge max, l'app propose +min à +max kg à la séance suivante.</p>
 
   <div class="tpl-rows">
-    <?php foreach ($rows as $r): $k = (int)$r['id']; ?>
-      <fieldset class="tpl-row card">
-        <legend><?= thumb_zoom($r, $r['exercise_id']) ?> <a href="?p=exercise&id=<?= h($r['exercise_id']) ?>"><?= h(ex_name($r)) ?></a></legend>
+    <?php foreach ($rows as $i => $r):
+        $k = (int)$r['id'];
+        $g = $r['superset_group'];
+        $prevG = $rows[$i - 1]['superset_group'] ?? null;
+        $nextG = $rows[$i + 1]['superset_group'] ?? null;
+        $ssFirst = $g !== null && $g !== $prevG;
+        $ssLast = $g !== null && $g !== $nextG;
+    ?>
+      <?php if ($ssFirst): $members = array_values(array_filter($rows, fn($x) => $x['superset_group'] === $g)); ?>
+        <p class="ss-head" data-ss-head="<?= (int)$g ?>"><?= drag_handle('Déplacer le superset') ?><?= icon('link') ?><?= h(ss_title(count($members), max(array_map(fn($x) => (int)$x['sets'], $members)))) ?></p>
+      <?php endif; ?>
+      <fieldset class="tpl-row card<?= $g !== null ? ' in-superset' : '' ?><?= $ssFirst ? ' ss-first' : '' ?><?= $ssLast ? ' ss-last' : '' ?>"
+                id="ex-<?= $k ?>" data-id="<?= $k ?>"<?= $g !== null ? ' data-ss="' . (int)$g . '"' : '' ?>>
+        <legend><?= drag_handle("Déplacer l'exercice") ?><span class="badge"><?= h($r['label']) ?></span> <?= thumb_zoom($r, $r['exercise_id']) ?> <a href="?p=exercise&id=<?= h($r['exercise_id']) ?>"><?= h(ex_name($r)) ?></a></legend>
         <div class="tpl-fields">
-          <label>Position <input name="rows[<?= $k ?>][position]" value="<?= (int)$r['position'] ?>" inputmode="numeric" size="2"></label>
-          <label>Ordre <input name="rows[<?= $k ?>][label]" value="<?= h($r['label']) ?>" size="3"></label>
           <label class="wide">Type <input name="rows[<?= $k ?>][kind]" value="<?= h($r['kind']) ?>" placeholder="Polyarticulaire, Superset 1…"></label>
           <label class="wide">Muscle cible <input name="rows[<?= $k ?>][focus]" value="<?= h($r['focus']) ?>" placeholder="Grands dorsaux (largeur)…"></label>
           <label>Séries <input name="rows[<?= $k ?>][sets]" value="<?= (int)$r['sets'] ?>" inputmode="numeric"></label>
@@ -74,6 +92,7 @@ $rows = template_exercises($id);
           <label class="check-del"><input type="checkbox" name="rows[<?= $k ?>][delete]" value="1"> Retirer</label>
         </div>
       </fieldset>
+      <?php if (isset($rows[$i + 1])) echo ss_joint($g !== null && $g === $nextG, 'name="ss_toggle" value="' . $k . '"'); ?>
     <?php endforeach; ?>
   </div>
 

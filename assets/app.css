@@ -338,13 +338,65 @@ a.chip:hover { border-color: var(--line-strong); color: var(--text); }
 
 /* --- Séance en cours ------------------------------------------------------ */
 .timer-big { font: 500 2.6rem/1 var(--mono); letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
-.exlist { display: grid; gap: var(--s4); }
+.exlist { display: grid; }
 .excard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: var(--s4) var(--s4) var(--s3); }
 /* Superset : un ruban jaune relie les exercices A/B, comme un trait de surligneur dans le carnet */
-.excard.in-superset { border-left: 3px solid var(--accent); }
-.excard.in-superset:not(.ss-last) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; margin-bottom: calc(-1 * var(--s4)); border-bottom-style: dashed; }
-.excard.in-superset:not(.ss-first) { border-top-left-radius: 0; border-top-right-radius: 0; border-top: 0; }
-.ss-tag { font: 500 .68rem var(--mono); color: var(--accent-text); text-transform: uppercase; letter-spacing: .08em; }
+.in-superset { border-left: 3px solid var(--accent); }
+.in-superset:not(.ss-last) { border-bottom: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.in-superset:not(.ss-first) { border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0; }
+.ss-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--s2); margin: var(--s2) 0 var(--s2); font: 500 .72rem var(--mono); color: var(--accent-text); text-transform: uppercase; letter-spacing: .08em; }
+.ss-head .icon { width: 15px; height: 15px; }
+.ss-head .muted { margin-left: auto; font: 400 .8rem var(--body, inherit); text-transform: none; letter-spacing: 0; }
+/* Jonction entre deux exercices : bouton discret « Lier en superset », ou couture du groupe avec « Délier » */
+.ss-joint { position: relative; display: flex; justify-content: center; align-items: center; min-height: 44px; }
+.ss-joint.is-linked { background: var(--surface); border-right: 1px solid var(--line); border-left: 3px solid var(--accent); }
+.ss-joint.is-linked::before { content: ''; position: absolute; left: var(--s4); right: var(--s4); top: 50%; border-top: 1px dashed var(--line-strong); }
+.ss-btn { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 12px; border: 1px dashed var(--line-strong); border-radius: 999px; background: var(--bg); color: var(--muted); font: 500 .7rem var(--mono); text-transform: uppercase; letter-spacing: .06em; cursor: pointer; transition: color .15s var(--ease), border-color .15s var(--ease); }
+.ss-joint.is-linked .ss-btn { background: var(--surface); border-style: solid; }
+.ss-btn:hover, .ss-btn:focus-visible { color: var(--accent-text); border-color: var(--accent); }
+.ss-btn:disabled { opacity: .5; cursor: progress; }
+.ss-btn .icon { width: 14px; height: 14px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* --- Glisser-déposer (mobile d'abord : poignée large pour le pouce, pas de défilement parasite) --- */
+.exlist, .tpl-rows { position: relative; }
+.drag-handle {
+  flex: none; display: grid; place-items: center; width: 32px; height: 44px; margin: 0 -4px 0 -10px;
+  border: 0; border-radius: var(--r-sm); background: none; color: var(--faint);
+  cursor: grab; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.drag-handle .icon { width: 22px; height: 22px; stroke-width: 3; }
+.drag-handle:focus-visible { color: var(--text); background: var(--surface-2); }
+.ss-head .drag-handle { width: 32px; height: 36px; margin: 0 -4px 0 -8px; color: var(--accent-text); }
+.ss-head .drag-handle + .icon { display: none; }
+.tpl-row legend .drag-handle { margin-left: -6px; }
+@media (hover: hover) { .drag-handle:hover { color: var(--text); background: var(--surface-2); } }
+/* Pendant le tri : cartes repliées sur leur titre */
+.is-sorting { -webkit-user-select: none; user-select: none; }
+.is-sorting .excard > :not(.excard-head),
+.is-sorting .excard .menu,
+.is-sorting .tpl-row > :not(legend),
+.is-sorting .ss-joint,
+.is-sorting .ss-head .muted { display: none; }
+.is-sorting .excard { padding: var(--s2) var(--s3); }
+.is-sorting .tpl-row { padding: var(--s2) var(--s3); }
+.is-sorting .tpl-row > legend { float: left; width: 100%; padding: 0; margin: 0; }
+.is-sorting .excard:not(.in-superset), .is-sorting .excard.ss-last,
+.is-sorting .tpl-row:not(.in-superset), .is-sorting .tpl-row.ss-last { margin-bottom: var(--s2); }
+.is-sorting .in-superset:not(.ss-first) { border-top: 1px dashed var(--line); }
+.is-sorting .thumb { width: 36px; height: 36px; }
+.is-sorting .excard-title p { display: none; }
+.is-sorting .excard-title h3 { font-size: 1rem; }
+.is-dragging { position: relative; z-index: 6; cursor: grabbing; box-shadow: 0 14px 34px rgb(0 0 0 / .35); }
+.ss-head.is-dragging { background: var(--bg); box-shadow: none; }
+.drop-line {
+  position: absolute; left: 0; right: 0; z-index: 5; height: 3px; margin-top: -1.5px; border-radius: 3px;
+  background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent); pointer-events: none;
+}
+.is-busy { opacity: .6; pointer-events: none; }
+.tpl-row { scroll-margin-top: 90px; }
+@media (min-width: 700px) {
+  .drag-handle { width: 28px; height: 40px; margin-left: -8px; }
+}
 .excard-head { display: flex; align-items: center; gap: var(--s3); }
 .excard-title { flex: 1; min-width: 0; }
 .excard-title h3 { font: 700 1.12rem/1.15 var(--display); letter-spacing: -.01em; }
@@ -447,10 +499,13 @@ dialog::backdrop { background: rgba(10, 9, 7, .6); backdrop-filter: blur(2px); }
 .steps li::before { content: counter(s, decimal-leading-zero); font: 500 .8rem/1.9 var(--mono); color: var(--accent-text); }
 
 /* --- Programmes ------------------------------------------------------------ */
-.tpl-rows { display: grid; gap: var(--s3); margin: var(--s4) 0; }
+.tpl-rows { display: grid; margin: var(--s4) 0; }
 .tpl-row { margin: 0; }
 .tpl-row legend { display: flex; align-items: center; gap: var(--s2); font-size: 1rem; color: var(--text); font-weight: 600; }
 .tpl-row legend .thumb { width: 36px; height: 36px; }
+/* Suite d'un superset : pas de bordure haute, le titre passe dans la carte pour ne pas couper le ruban */
+.tpl-row.in-superset:not(.ss-first) > legend { float: left; width: 100%; padding: 0; margin-bottom: var(--s3); }
+.tpl-row.in-superset:not(.ss-first) > .tpl-fields { clear: both; }
 .tpl-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--s2); }
 .tpl-fields .wide { grid-column: span 2; }
 .tpl-fields .full { grid-column: 1 / -1; }
