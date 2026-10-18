@@ -21,5 +21,6 @@ $title = 'Connexion';
     <button class="btn big">Se connecter</button>
   </form>
 
-  <?php if (registration_open()): ?><p class="auth-alt">Pas encore de compte ? <a href="?p=register">Créer un compte</a></p><?php endif; ?>
+  <p class="auth-alt">Pas encore de compte ? <a href="?p=register">Créer un compte</a>
+    <?php if (!registration_open()): ?><br><span class="small">Les inscriptions sont fermées pour l'instant : l'administrateur peut les ouvrir dans Mon compte.</span><?php endif; ?></p>
 </div>

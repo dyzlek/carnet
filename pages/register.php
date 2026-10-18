@@ -18,8 +18,9 @@ if (!registration_open()):
 <div class="auth">
   <p class="eyebrow">Carnet d'entraînement</p>
   <h1 class="page-title">Inscriptions fermées</h1>
-  <p class="lede">Les nouveaux comptes sont désactivés sur ce carnet. Demande à l'administrateur de les ouvrir.</p>
-  <p class="auth-alt"><a href="?p=login">Se connecter</a></p>
+  <p class="lede">Les nouveaux comptes sont désactivés sur ce carnet. Demande à l'administrateur de les ouvrir
+    (Mon compte → Administration → Ouvrir les inscriptions).</p>
+  <p class="auth-alt">Déjà un compte ? <a href="?p=login">Se connecter</a></p>
 </div>
 <?php return; endif; ?>
 <div class="auth">
