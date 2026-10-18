@@ -15,10 +15,13 @@ $line = function (string $status, string $msg) use (&$fails, &$warns) {
 
 echo "== Prérequis serveur" . PHP_EOL;
 $line(version_compare(PHP_VERSION, '8.1.0', '>=') ? 'OK' : 'FAIL', 'PHP ' . PHP_VERSION . ' (8.1 minimum)');
-foreach (['pdo_sqlite', 'json', 'session'] as $ext) {
+$root = dirname(__DIR__);
+define('ROOT', $root);
+require $root . '/src/config.php';
+$line('OK', 'base de données : ' . (DB_DRIVER === 'mysql' ? 'MySQL (' . DB_NAME . '@' . DB_HOST . ', config.php)' : 'SQLite'));
+foreach ([DB_DRIVER === 'mysql' ? 'pdo_mysql' : 'pdo_sqlite', 'json', 'session'] as $ext) {
     $line(extension_loaded($ext) ? 'OK' : 'FAIL', "extension $ext");
 }
-$root = dirname(__DIR__);
 $data = getenv('CARNET_DATA') ?: $root . '/data';
 $line(is_dir($data) && is_writable($data) ? 'OK' : 'FAIL', "dossier de données accessible en écriture : $data");
 $line(is_file($data . '/exercises.json') || is_file($data . '/muscu.sqlite') ? 'OK' : 'FAIL', 'data/exercises.json présent (nécessaire au premier lancement)');
@@ -26,9 +29,8 @@ $line(is_file($root . '/.htaccess') ? 'OK' : 'WARN', '.htaccess présent (Apache
 $line(is_file($data . '/.htaccess') ? 'OK' : 'WARN', 'data/.htaccess présent');
 $line(ini_get('display_errors') && getenv('CARNET_DEBUG') !== '1' ? 'WARN' : 'OK', 'display_errors (forcé à Off par l\'app de toute façon)');
 
-if (extension_loaded('pdo_sqlite')) {
+if (extension_loaded(DB_DRIVER === 'mysql' ? 'pdo_mysql' : 'pdo_sqlite')) {
     try {
-        define('ROOT', $root);
         define('DATA_DIR', $data);
         define('DATASET_MEDIA', '');
         require $root . '/src/security.php';
@@ -38,11 +40,11 @@ if (extension_loaded('pdo_sqlite')) {
         require $root . '/src/programs.php';
         require $root . '/src/repo.php';
         $pdo = db();
-        $v = (int)$pdo->query('PRAGMA user_version')->fetchColumn();
-        $line('OK', 'base SQLite ouverte, schéma v' . $v . ', ' . $pdo->query('SELECT COUNT(*) FROM exercises')->fetchColumn() . ' exercices, '
+        $v = (int)$pdo->query(is_mysql() ? "SELECT value FROM settings WHERE `key` = 'schema_version'" : 'PRAGMA user_version')->fetchColumn();
+        $line('OK', 'base ' . (is_mysql() ? 'MySQL' : 'SQLite') . ' ouverte, schéma v' . $v . ', ' . $pdo->query('SELECT COUNT(*) FROM exercises')->fetchColumn() . ' exercices, '
             . $pdo->query('SELECT COUNT(*) FROM users')->fetchColumn() . ' compte(s)');
-        $line($pdo->query('PRAGMA integrity_check')->fetchColumn() === 'ok' ? 'OK' : 'FAIL', 'intégrité de la base');
-        $reg = $pdo->query("SELECT value FROM settings WHERE key = 'registration'")->fetchColumn();
+        if (!is_mysql()) $line($pdo->query('PRAGMA integrity_check')->fetchColumn() === 'ok' ? 'OK' : 'FAIL', 'intégrité de la base');
+        $reg = $pdo->query("SELECT value FROM settings WHERE `key` = 'registration'")->fetchColumn();
         $users = (int)$pdo->query('SELECT COUNT(*) FROM users')->fetchColumn();
         $line($users > 0 && $reg === 'open' ? 'WARN' : 'OK', $users === 0 ? 'aucun compte : crée le tien tout de suite après la mise en ligne'
             : 'inscriptions ' . ($reg === 'open' ? 'OUVERTES (pense à les refermer)' : 'fermées'));

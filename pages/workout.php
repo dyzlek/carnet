@@ -109,7 +109,7 @@ foreach ($wes as $idx => $we):
 ?>
   <?php if ($ssFirst):
       $members = array_values(array_filter($wes, fn($x) => $x['superset_group'] === $group));
-      $rounds = (int)q('SELECT MAX(n) FROM (SELECT COUNT(*) AS n FROM sets WHERE workout_exercise_id IN (' . implode(',', array_map(fn($x) => (int)$x['we_id'], $members)) . ') GROUP BY workout_exercise_id)')->fetchColumn(); ?>
+      $rounds = (int)q('SELECT MAX(n) FROM (SELECT COUNT(*) AS n FROM sets WHERE workout_exercise_id IN (' . implode(',', array_map(fn($x) => (int)$x['we_id'], $members)) . ') GROUP BY workout_exercise_id) AS t')->fetchColumn(); ?>
     <p class="ss-head" data-ss-head="<?= (int)$group ?>"><?= drag_handle('Déplacer le superset') ?><?= icon('link') ?><?= h(ss_title(count($members), $rounds)) ?><span class="muted">enchaîner sans repos, repos après le tour</span></p>
   <?php endif; ?>
   <article class="excard<?= $isSuper ? ' in-superset' : '' ?><?= $ssFirst ? ' ss-first' : '' ?><?= $isSuper && $nextGroup !== $group ? ' ss-last' : '' ?>"

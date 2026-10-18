@@ -345,9 +345,8 @@ function save_exercise_note(string $exerciseId, string $note): void
         q('DELETE FROM exercise_notes WHERE user_id = ? AND exercise_id = ?', [uid(), $exerciseId]);
         return;
     }
-    q("INSERT INTO exercise_notes (user_id, exercise_id, note) VALUES (?, ?, ?)
-       ON CONFLICT(user_id, exercise_id) DO UPDATE SET note = excluded.note, updated_at = datetime('now', 'localtime')",
-      [uid(), $exerciseId, $note]);
+    q(upsert_sql('exercise_notes', ['user_id', 'exercise_id', 'note', 'updated_at'], ['user_id', 'exercise_id'], ['note', 'updated_at']),
+      [uid(), $exerciseId, $note, now()]);
 }
 
 /** Repos entre séries (s) d'un exercice de séance ; 15 s au minimum pour un « 0 » de superset. */

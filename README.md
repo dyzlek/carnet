@@ -7,6 +7,7 @@ Séances, surcharge progressive, muscles travaillés, activités cardio, poids e
 
 ![PHP](https://img.shields.io/badge/PHP-8.1+-777BB4?logo=php&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-PDO-003B57?logo=sqlite&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL%20%2F%20MariaDB-PDO-4479A1?logo=mysql&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JS-vanilla-F7DF1E?logo=javascript&logoColor=black)
 ![Chart.js](https://img.shields.io/badge/Chart.js-4.4.1-FF6384?logo=chartdotjs&logoColor=white)
 ![Sans dépendances](https://img.shields.io/badge/Composer%20%2F%20npm-aucun-success)
@@ -73,7 +74,7 @@ Thème sombre (encre) et clair (papier), interface pensée pour le téléphone �
 
 ## Lancer en local
 
-Prérequis : **PHP 8.1+** avec `pdo_sqlite`.
+Prérequis : **PHP 8.1+** avec `pdo_sqlite` (ou `pdo_mysql` et une base MySQL / MariaDB : copie `config.example.php` en `config.php`).
 
 ```bash
 git clone https://github.com/dyzlek/carnet.git

@@ -5,9 +5,26 @@ comptes et données cloisonnés, en-têtes de sécurité présents.
 
 ## Prérequis
 
-- PHP **8.1 ou plus** avec `pdo_sqlite` (présent chez quasiment tous les hébergeurs).
+- PHP **8.1 ou plus** avec `pdo_sqlite` (présent chez quasiment tous les hébergeurs) **ou** `pdo_mysql` et une base
+  MySQL / MariaDB (serveur d'école, d'IUT…) : voir « Avec une base MySQL » ci-dessous.
 - Apache 2.4 (les `.htaccess` fournis protègent tout) **ou** nginx (voir plus bas).
 - **HTTPS** (Let's Encrypt, gratuit chez la plupart des hébergeurs). Sans HTTPS, les mots de passe passent en clair. HTTPS est aussi requis pour installer l'app sur le téléphone et l'utiliser hors ligne.
+
+## Avec une base MySQL (serveur de l'IUT, pas de SQLite)
+
+Si le site affiche « L'extension PHP pdo_sqlite n'est pas disponible sur ce serveur », utilise la base MySQL fournie
+(visible dans phpMyAdmin) :
+
+1. Envoie les fichiers de Carnet comme d'habitude (étapes 1 et 2 ci-dessous).
+2. Sur le serveur, à côté de `index.php`, copie `config.example.php` en **`config.php`** et remplis-le :
+   `DB_HOST` = le « Serveur » affiché en haut de phpMyAdmin (souvent `localhost`), `DB_NAME` = le nom de ta base
+   (colonne de gauche), `DB_USER` / `DB_PASS` = tes identifiants MySQL.
+   Écris le mot de passe **uniquement dans ce fichier sur le serveur** : il n'est jamais envoyé sur GitHub.
+3. Ouvre le site : les tables sont créées automatiquement dans ta base et les 1 324 exercices importés (quelques secondes).
+   Le dossier `data/` doit rester accessible en écriture (sessions de connexion).
+4. Crée ton compte (étape 3).
+
+Pour vérifier en SSH : `php tools/check.php https://…/` indique « base de données : MySQL » et compte les exercices.
 
 ## 1. Préparer le paquet (sur ton PC)
 
