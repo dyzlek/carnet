@@ -5,11 +5,11 @@ if (is_post() && ($_POST['action'] ?? '') === 'create') {
     if ($name !== '') {
         $id = 'c' . substr(md5(uniqid('', true)), 0, 8);
         q('INSERT INTO exercises (id, owner_id, name, name_fr, body_part, equipment, is_custom, steps_fr, steps_en) VALUES (?,?,?,?,?,?,1,?,?)',
-            [$id, uid(), $name, $name, 'custom', $_POST['equipment'] ?: 'other', '[]', '[]']);
+            [$id, uid(), $name, $name, 'custom', ($_POST['equipment'] ?? '') ?: 'other', '[]', '[]']);
         $primary = (array)($_POST['primary'] ?? []);
-        foreach ($primary as $m) if (isset(MUSCLES[$m])) q('INSERT OR IGNORE INTO exercise_muscles VALUES (?,?,?)', [$id, $m, 'primary']);
+        foreach ($primary as $m) if (isset(MUSCLES[$m])) q(insert_or('IGNORE') . ' INTO exercise_muscles VALUES (?,?,?)', [$id, $m, 'primary']);
         foreach ((array)($_POST['secondary'] ?? []) as $m) {
-            if (isset(MUSCLES[$m]) && !in_array($m, $primary, true)) q('INSERT OR IGNORE INTO exercise_muscles VALUES (?,?,?)', [$id, $m, 'secondary']);
+            if (isset(MUSCLES[$m]) && !in_array($m, $primary, true)) q(insert_or('IGNORE') . ' INTO exercise_muscles VALUES (?,?,?)', [$id, $m, 'secondary']);
         }
         flash('Exercice créé.');
         redirect('?p=exercise&id=' . $id);

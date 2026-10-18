@@ -58,12 +58,12 @@ function normalize_email(string $email): string
 function registration_open(): bool
 {
     if (users_count() === 0) return true;
-    return q("SELECT value FROM settings WHERE key = 'registration'")->fetchColumn() === 'open';
+    return q("SELECT value FROM settings WHERE `key` = 'registration'")->fetchColumn() === 'open';
 }
 
 function set_registration(bool $open): void
 {
-    q("INSERT INTO settings (key, value) VALUES ('registration', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", [$open ? 'open' : 'closed']);
+    q(upsert_sql('settings', ['key', 'value'], ['key'], ['value']), ['registration', $open ? 'open' : 'closed']);
 }
 
 /** Retourne une liste d'erreurs (vide = compte créé et connecté). */
@@ -99,8 +99,8 @@ function claim_orphans(PDO $pdo, int $uid): void
         $pdo->prepare("UPDATE $t SET user_id = ? WHERE user_id IS NULL")->execute([$uid]);
     }
     $pdo->prepare('UPDATE exercises SET owner_id = ? WHERE is_custom = 1 AND owner_id IS NULL')->execute([$uid]);
-    $pdo->prepare("INSERT OR IGNORE INTO user_settings (user_id, key, value)
-                   SELECT ?, key, value FROM settings WHERE key IN ('height', 'goal_weight', 'seeded_programs')")->execute([$uid]);
+    $pdo->prepare(insert_or('IGNORE') . " INTO user_settings (user_id, `key`, value)
+                   SELECT ?, `key`, value FROM settings WHERE `key` IN ('height', 'goal_weight', 'seeded_programs')")->execute([$uid]);
     $pdo->commit();
 }
 
@@ -136,7 +136,7 @@ function log_in(int $uid): void
     session_regenerate_id(true);
     $_SESSION['uid'] = $uid;
     $_SESSION['csrf'] = bin2hex(random_bytes(32));
-    q("UPDATE users SET last_login_at = datetime('now', 'localtime') WHERE id = ?", [$uid]);
+    q('UPDATE users SET last_login_at = ? WHERE id = ?', [now(), $uid]);
 }
 
 function log_out(): void

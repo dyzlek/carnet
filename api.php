@@ -171,7 +171,7 @@ try {
                 'measurements' => q('SELECT date, site, value FROM measurements WHERE user_id = ? ORDER BY date', [$uid])->fetchAll(),
                 'activities' => q('SELECT type, started_at, duration_s, distance_km, intensity, calories, avg_hr, elevation_m, notes FROM activities WHERE user_id = ? ORDER BY started_at', [$uid])->fetchAll(),
                 'custom_exercises' => q('SELECT id, name, equipment FROM exercises WHERE owner_id = ?', [$uid])->fetchAll(),
-                'settings' => q('SELECT key, value FROM user_settings WHERE user_id = ?', [$uid])->fetchAll(PDO::FETCH_KEY_PAIR),
+                'settings' => q('SELECT `key`, value FROM user_settings WHERE user_id = ?', [$uid])->fetchAll(PDO::FETCH_KEY_PAIR),
             ];
             header('Content-Type: application/json; charset=utf-8');
             header('Content-Disposition: attachment; filename="carnet-' . date('Y-m-d') . '.json"');

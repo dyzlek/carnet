@@ -157,7 +157,7 @@ function ex_name(array $e): string
 
 function setting(string $key, ?string $default = null): ?string
 {
-    $st = db()->prepare('SELECT value FROM user_settings WHERE user_id = ? AND key = ?');
+    $st = db()->prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?');
     $st->execute([uid(), $key]);
     $v = $st->fetchColumn();
     return $v === false ? $default : $v;
@@ -165,7 +165,7 @@ function setting(string $key, ?string $default = null): ?string
 
 function set_setting(string $key, ?string $value): void
 {
-    db()->prepare('INSERT INTO user_settings (user_id, key, value) VALUES (?, ?, ?) ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value')
+    db()->prepare(upsert_sql('user_settings', ['user_id', 'key', 'value'], ['user_id', 'key'], ['value']))
         ->execute([uid(), $key, $value]);
 }
 

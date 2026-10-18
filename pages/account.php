@@ -62,10 +62,10 @@ if (is_post()) {
 
 $title = 'Mon compte';
 $stats = q('SELECT
-    (SELECT COUNT(*) FROM workouts WHERE user_id = :u) AS workouts,
-    (SELECT COUNT(*) FROM templates WHERE user_id = :u) AS templates,
-    (SELECT COUNT(*) FROM bodyweight WHERE user_id = :u) AS weighins,
-    (SELECT MIN(started_at) FROM workouts WHERE user_id = :u) AS first', ['u' => uid()])->fetch();
+    (SELECT COUNT(*) FROM workouts WHERE user_id = ?) AS workouts,
+    (SELECT COUNT(*) FROM templates WHERE user_id = ?) AS templates,
+    (SELECT COUNT(*) FROM bodyweight WHERE user_id = ?) AS weighins,
+    (SELECT MIN(started_at) FROM workouts WHERE user_id = ?) AS first', array_fill(0, 4, uid()))->fetch();
 
 function form_errors(array $errors, string $key): string
 {

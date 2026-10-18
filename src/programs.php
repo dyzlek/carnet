@@ -79,7 +79,7 @@ const PROGRAMS = [
 /** Ajuste une seule fois le catalogue partagé (noms français, muscles) pour les exercices des programmes. */
 function tune_catalog(PDO $pdo): void
 {
-    if ($pdo->query("SELECT 1 FROM settings WHERE key = 'catalog_tuned'")->fetchColumn()) return;
+    if ($pdo->query("SELECT 1 FROM settings WHERE `key` = 'catalog_tuned'")->fetchColumn()) return;
     $pdo->beginTransaction();
     $up = $pdo->prepare('UPDATE exercises SET name_fr = ? WHERE id = ? AND name_fr IS NULL');
     $del = $pdo->prepare('DELETE FROM exercise_muscles WHERE exercise_id = ?');
@@ -92,7 +92,7 @@ function tune_catalog(PDO $pdo): void
             foreach ($secondary as $m) $ins->execute([$id, $m, 'secondary']);
         }
     }
-    $pdo->exec("INSERT OR REPLACE INTO settings (key, value) VALUES ('catalog_tuned', '1')");
+    $pdo->exec(insert_or('REPLACE') . " INTO settings (`key`, value) VALUES ('catalog_tuned', '1')");
     $pdo->commit();
 }
 
@@ -100,7 +100,7 @@ function tune_catalog(PDO $pdo): void
 function seed_programs(PDO $pdo, int $uid): void
 {
     tune_catalog($pdo);
-    $get = $pdo->prepare("SELECT value FROM user_settings WHERE user_id = ? AND key = 'seeded_programs'");
+    $get = $pdo->prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'seeded_programs'");
     $get->execute([$uid]);
     $done = json_decode((string)($get->fetchColumn() ?: '[]'), true) ?: [];
     $changed = false;
@@ -141,8 +141,7 @@ function seed_programs(PDO $pdo, int $uid): void
     }
 
     if ($changed) {
-        $pdo->prepare("INSERT INTO user_settings (user_id, key, value) VALUES (?, 'seeded_programs', ?)
-                       ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value")
-            ->execute([$uid, json_encode($done, JSON_UNESCAPED_UNICODE)]);
+        $pdo->prepare(upsert_sql('user_settings', ['user_id', 'key', 'value'], ['user_id', 'key'], ['value']))
+            ->execute([$uid, 'seeded_programs', json_encode($done, JSON_UNESCAPED_UNICODE)]);
     }
 }

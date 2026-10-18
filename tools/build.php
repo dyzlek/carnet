@@ -8,7 +8,7 @@ if (!class_exists('ZipArchive')) exit("Extension zip absente : lance avec  php -
 
 $root = dirname(__DIR__);
 $withDb = in_array('--with-db', $argv, true);
-$include = ['.htaccess', 'index.php', 'api.php', 'router.php', 'robots.txt', 'manifest.json', 'sw.js', 'README.md', 'DEPLOIEMENT.md', 'THIRD_PARTY.md',
+$include = ['.htaccess', 'index.php', 'api.php', 'router.php', 'robots.txt', 'manifest.json', 'sw.js', 'config.example.php', 'README.md', 'DEPLOIEMENT.md', 'THIRD_PARTY.md',
             'assets', 'src', 'pages', 'tools', 'data/.htaccess', 'data/exercises.json'];
 $exclude = '#(^|/)(\.claude|dist|backups|sessions)(/|$)|\.log$|\.sqlite-(wal|shm)$#';
 

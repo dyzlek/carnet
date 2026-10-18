@@ -14,3 +14,6 @@ dist/
 Thumbs.db
 .vscode/
 .idea/
+
+# Configuration du serveur (identifiants MySQL)
+/config.php

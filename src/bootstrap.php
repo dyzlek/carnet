@@ -4,6 +4,7 @@ declare(strict_types=1);
 define('ROOT', dirname(__DIR__));
 // CARNET_DATA permet de pointer vers un autre dossier de données (tests sur une copie).
 define('DATA_DIR', getenv('CARNET_DATA') ?: ROOT . '/data');
+require __DIR__ . '/config.php'; // base de données (config.php à la racine, sinon SQLite)
 // Les images / GIF du dataset sont servis directement depuis GitHub (1 324 fichiers, inutile de les copier).
 define('DATASET_MEDIA', 'https://raw.githubusercontent.com/hasaneyldrm/exercises-dataset/main/');
 

@@ -6,8 +6,7 @@ if (is_post()) {
         case 'weight':
             $w = parse_num($_POST['weight'] ?? null);
             if ($w) {
-                q('INSERT INTO bodyweight (user_id, date, weight, body_fat, notes) VALUES (?,?,?,?,?)
-                   ON CONFLICT(user_id, date) DO UPDATE SET weight = excluded.weight, body_fat = excluded.body_fat, notes = excluded.notes',
+                q(upsert_sql('bodyweight', ['user_id', 'date', 'weight', 'body_fat', 'notes'], ['user_id', 'date'], ['weight', 'body_fat', 'notes']),
                     [uid(), $date, $w, parse_num($_POST['body_fat'] ?? null), trim((string)($_POST['notes'] ?? '')) ?: null]);
                 flash('Pesée enregistrée.');
             }
@@ -20,7 +19,7 @@ if (is_post()) {
             foreach (MEASURE_SITES as $k => $label) {
                 $v = parse_num($_POST['m'][$k] ?? null);
                 if ($v) {
-                    q('INSERT INTO measurements (user_id, date, site, value) VALUES (?,?,?,?) ON CONFLICT(user_id, date, site) DO UPDATE SET value = excluded.value', [uid(), $date, $k, $v]);
+                    q(upsert_sql('measurements', ['user_id', 'date', 'site', 'value'], ['user_id', 'date', 'site'], ['value']), [uid(), $date, $k, $v]);
                     $n++;
                 }
             }

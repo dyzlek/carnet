@@ -5,9 +5,30 @@ function db(): PDO
     static $pdo = null;
     if ($pdo) return $pdo;
 
+    if (is_mysql()) {
+        if (!extension_loaded('pdo_mysql')) db_fail("L'extension PHP pdo_mysql n'est pas chargée sur ce serveur.");
+        try {
+            $pdo = new PDO('mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=utf8mb4', DB_USER, DB_PASS, [
+                PDO::ATTR_EMULATE_PREPARES => false,  // entiers et décimaux renvoyés en nombres, comme avec SQLite
+                PDO::ATTR_STRINGIFY_FETCHES => false,
+            ]);
+        } catch (PDOException $e) {
+            error_log('[db] ' . $e->getMessage());
+            db_fail('Connexion à MySQL impossible : vérifie DB_HOST, DB_NAME, DB_USER et DB_PASS dans config.php.');
+        }
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+        // || = concaténation comme en SQLite ; pas de ONLY_FULL_GROUP_BY ; heure locale du PHP
+        $pdo->exec("SET SESSION sql_mode = 'PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION'");
+        $pdo->exec("SET time_zone = '" . date('P') . "'");
+        migrate_mysql($pdo);
+        return $pdo;
+    }
+
     if (!extension_loaded('pdo_sqlite')) {
-        http_response_code(500);
-        exit("L'extension PHP pdo_sqlite n'est pas chargée. Lance l'app avec start.bat (ou : php -d extension=pdo_sqlite -S localhost:8000 router.php).");
+        db_fail(PHP_SAPI === 'cli-server'
+            ? "L'extension PHP pdo_sqlite n'est pas chargée. Lance l'app avec start.bat (ou : php -d extension=pdo_sqlite -S localhost:8000 router.php)."
+            : "L'extension PHP pdo_sqlite n'est pas disponible sur ce serveur. Utilise une base MySQL : copie config.example.php en config.php et remplis-le (voir DEPLOIEMENT.md).");
     }
     if (!is_dir(DATA_DIR)) mkdir(DATA_DIR, 0777, true);
 
@@ -19,6 +40,36 @@ function db(): PDO
 
     migrate($pdo);
     return $pdo;
+}
+
+function is_mysql(): bool
+{
+    return DB_DRIVER === 'mysql';
+}
+
+function db_fail(string $msg): never
+{
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit($msg);
+}
+
+/** « INSERT OR IGNORE » (SQLite) / « INSERT IGNORE » (MySQL) ; idem pour REPLACE. */
+function insert_or(string $mode): string
+{
+    return is_mysql() ? ($mode === 'REPLACE' ? 'REPLACE' : 'INSERT IGNORE') : "INSERT OR $mode";
+}
+
+/**
+ * Requête « insérer ou mettre à jour » : ON CONFLICT (SQLite) / ON DUPLICATE KEY UPDATE (MySQL).
+ * $keys = colonnes de la clé unique, $update = colonnes à mettre à jour si la ligne existe déjà.
+ */
+function upsert_sql(string $table, array $cols, array $keys, array $update): string
+{
+    $c = fn($n) => '`' . $n . '`';
+    $sql = "INSERT INTO $table (" . implode(', ', array_map($c, $cols)) . ') VALUES (' . implode(', ', array_fill(0, count($cols), '?')) . ')';
+    if (is_mysql()) return $sql . ' ON DUPLICATE KEY UPDATE ' . implode(', ', array_map(fn($n) => $c($n) . ' = VALUES(' . $c($n) . ')', $update));
+    return $sql . ' ON CONFLICT(' . implode(', ', array_map($c, $keys)) . ') DO UPDATE SET ' . implode(', ', array_map(fn($n) => $c($n) . ' = excluded.' . $c($n), $update));
 }
 
 function migrate(PDO $pdo): void
@@ -141,10 +192,10 @@ function import_exercises(PDO $pdo, string $file): int
     $data = json_decode(file_get_contents($file), true);
     if (!is_array($data)) return 0;
 
-    $insEx = $pdo->prepare('INSERT OR REPLACE INTO exercises
+    $insEx = $pdo->prepare(insert_or('REPLACE') . ' INTO exercises
         (id, name, body_part, equipment, target, secondary, instructions_fr, steps_fr, steps_en, image, gif, is_custom)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,0)');
-    $insM = $pdo->prepare('INSERT OR IGNORE INTO exercise_muscles (exercise_id, muscle, role) VALUES (?,?,?)');
+    $insM = $pdo->prepare(insert_or('IGNORE') . ' INTO exercise_muscles (exercise_id, muscle, role) VALUES (?,?,?)');
 
     $pdo->beginTransaction();
     foreach ($data as $e) {
@@ -241,8 +292,8 @@ function migrate_v1(PDO $pdo): void
     CREATE INDEX IF NOT EXISTS idx_exercises_owner ON exercises(owner_id);
     SQL);
     // Base déjà utilisée avant les comptes : le catalogue a déjà reçu les renommages / muscles des programmes.
-    if ($pdo->query("SELECT 1 FROM settings WHERE key = 'seeded_programs'")->fetchColumn()) {
-        $pdo->exec("INSERT OR REPLACE INTO settings (key, value) VALUES ('catalog_tuned', '1')");
+    if ($pdo->query("SELECT 1 FROM settings WHERE `key` = 'seeded_programs'")->fetchColumn()) {
+        $pdo->exec("INSERT OR REPLACE INTO settings (`key`, value) VALUES ('catalog_tuned', '1')");
     }
     $pdo->exec('PRAGMA user_version = 1');
     $pdo->commit();
@@ -302,4 +353,140 @@ function migrate_v4(PDO $pdo): void
     PRAGMA user_version = 4;
     SQL);
     $pdo->commit();
+}
+
+/**
+ * MySQL / MariaDB : création directe du schéma actuel (équivalent de SQLite après migrate_v4).
+ * La version est gardée dans settings.schema_version pour les migrations futures.
+ */
+function migrate_mysql(PDO $pdo): void
+{
+    if (!$pdo->query("SHOW TABLES LIKE 'settings'")->fetchColumn()) {
+        $opts = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+        $tables = [
+            "CREATE TABLE users (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                email VARCHAR(190) NOT NULL UNIQUE,
+                name VARCHAR(100) NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_login_at VARCHAR(19) NULL)",
+            "CREATE TABLE settings (`key` VARCHAR(64) PRIMARY KEY, value TEXT NULL)",
+            "CREATE TABLE user_settings (
+                user_id INT NOT NULL, `key` VARCHAR(64) NOT NULL, value TEXT NULL,
+                PRIMARY KEY (user_id, `key`),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+            "CREATE TABLE login_attempts (email VARCHAR(190) NOT NULL, at INT NOT NULL, INDEX idx_login_attempts (email, at))",
+            "CREATE TABLE exercises (
+                id VARCHAR(32) PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                name_fr VARCHAR(255) NULL,
+                body_part VARCHAR(64) NULL,
+                equipment VARCHAR(64) NULL,
+                target VARCHAR(64) NULL,
+                secondary TEXT NULL,
+                instructions_fr TEXT NULL,
+                steps_fr MEDIUMTEXT NULL,
+                steps_en MEDIUMTEXT NULL,
+                image VARCHAR(255) NULL,
+                gif VARCHAR(255) NULL,
+                is_custom TINYINT NOT NULL DEFAULT 0,
+                owner_id INT NULL,
+                INDEX idx_exercises_owner (owner_id),
+                FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE)",
+            "CREATE TABLE exercise_muscles (
+                exercise_id VARCHAR(32) NOT NULL, muscle VARCHAR(32) NOT NULL, role VARCHAR(10) NOT NULL,
+                PRIMARY KEY (exercise_id, muscle), INDEX idx_em_muscle (muscle),
+                FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE)",
+            "CREATE TABLE exercise_notes (
+                user_id INT NOT NULL, exercise_id VARCHAR(32) NOT NULL, note TEXT NOT NULL,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, exercise_id),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE)",
+            "CREATE TABLE templates (
+                id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NULL, name VARCHAR(255) NOT NULL, notes TEXT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_templates_user (user_id),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+            "CREATE TABLE template_exercises (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                template_id INT NOT NULL,
+                position INT NOT NULL DEFAULT 0,
+                label VARCHAR(16) NULL,
+                exercise_id VARCHAR(32) NOT NULL,
+                kind VARCHAR(255) NULL,
+                focus VARCHAR(255) NULL,
+                sets INT NOT NULL DEFAULT 3,
+                reps_min INT NULL, reps_max INT NULL,
+                rest_min INT NULL, rest_max INT NULL, rest_after INT NULL,
+                rpe_min DOUBLE NULL, rpe_max DOUBLE NULL,
+                notes TEXT NULL,
+                overload_sets INT NULL, overload_reps INT NULL,
+                inc_min DOUBLE NULL, inc_max DOUBLE NULL,
+                superset_group INT NULL,
+                INDEX idx_te_template (template_id),
+                FOREIGN KEY (template_id) REFERENCES templates(id) ON DELETE CASCADE,
+                FOREIGN KEY (exercise_id) REFERENCES exercises(id))",
+            "CREATE TABLE workouts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NULL,
+                template_id INT NULL,
+                name VARCHAR(255) NOT NULL,
+                started_at VARCHAR(19) NOT NULL,
+                ended_at VARCHAR(19) NULL,
+                notes TEXT NULL,
+                INDEX idx_workouts_start (started_at), INDEX idx_workouts_user (user_id, started_at),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (template_id) REFERENCES templates(id) ON DELETE SET NULL)",
+            "CREATE TABLE workout_exercises (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                workout_id INT NOT NULL,
+                exercise_id VARCHAR(32) NOT NULL,
+                template_exercise_id INT NULL,
+                position INT NOT NULL DEFAULT 0,
+                label VARCHAR(16) NULL,
+                notes TEXT NULL,
+                superset_group INT NULL,
+                INDEX idx_we_workout (workout_id), INDEX idx_we_exercise (exercise_id),
+                FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
+                FOREIGN KEY (exercise_id) REFERENCES exercises(id),
+                FOREIGN KEY (template_exercise_id) REFERENCES template_exercises(id) ON DELETE SET NULL)",
+            "CREATE TABLE sets (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                workout_exercise_id INT NOT NULL,
+                set_number INT NOT NULL,
+                weight DOUBLE NULL, reps INT NULL, rpe DOUBLE NULL,
+                done TINYINT NOT NULL DEFAULT 0,
+                INDEX idx_sets_we (workout_exercise_id),
+                FOREIGN KEY (workout_exercise_id) REFERENCES workout_exercises(id) ON DELETE CASCADE)",
+            "CREATE TABLE bodyweight (
+                user_id INT NULL, date VARCHAR(10) NOT NULL, weight DOUBLE NOT NULL, body_fat DOUBLE NULL, notes TEXT NULL,
+                UNIQUE (user_id, date),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+            "CREATE TABLE measurements (
+                id INT AUTO_INCREMENT PRIMARY KEY, user_id INT NULL, date VARCHAR(10) NOT NULL, site VARCHAR(32) NOT NULL, value DOUBLE NOT NULL,
+                UNIQUE (user_id, date, site),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+            "CREATE TABLE activities (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                type VARCHAR(32) NOT NULL,
+                started_at VARCHAR(19) NOT NULL,
+                duration_s INT NOT NULL,
+                distance_km DOUBLE NULL,
+                intensity TINYINT NOT NULL DEFAULT 2,
+                calories INT NULL, avg_hr INT NULL, elevation_m INT NULL,
+                notes TEXT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_activities_user (user_id, started_at),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+        ];
+        foreach ($tables as $sql) $pdo->exec("$sql $opts");
+        $pdo->exec("INSERT INTO settings (`key`, value) VALUES ('schema_version', '4')");
+    }
+    if ((int)$pdo->query('SELECT COUNT(*) FROM exercises')->fetchColumn() === 0) {
+        import_exercises($pdo, DATA_DIR . '/exercises.json');
+    }
+    $pdo->exec("UPDATE exercises SET name = REPLACE(name, 'в°', '°') WHERE name LIKE '%в°%'");
 }
