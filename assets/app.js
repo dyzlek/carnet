@@ -3,7 +3,7 @@
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 
-  async function api(action, data = {}) {
+  async function apiSend(action, data = {}) {
     const res = await fetch('api.php?action=' + action, {
       method: 'POST',
       headers: {
@@ -17,6 +17,57 @@
     if (!res.ok || json.error) throw new Error(json.error || res.statusText);
     return json;
   }
+
+  // --- Hors ligne : les saisies partent dans une file d'attente et sont envoyées au retour du réseau ---
+  const QUEUE_KEY = 'carnet-queue';
+  const QUEUEABLE = {
+    set_update: (d) => `set:${d.id}:${d.field}`,
+    workout_notes: (d) => `notes:${d.id}`,
+    exercise_note: (d) => `note:${d.exercise}`,
+  };
+  const readQueue = () => { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]'); } catch (e) { return []; } };
+  function writeQueue(q) {
+    try { q.length ? localStorage.setItem(QUEUE_KEY, JSON.stringify(q)) : localStorage.removeItem(QUEUE_KEY); } catch (e) { /* stockage indisponible */ }
+    showSync(q.length);
+  }
+  function showSync(n) {
+    let bar = $('#sync-bar');
+    if (!n) { bar?.remove(); return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'sync-bar'; bar.className = 'sync-bar'; bar.setAttribute('role', 'status');
+      document.body.append(bar);
+    }
+    bar.textContent = n === 1 ? '1 saisie hors ligne, envoyée dès le retour du réseau' : `${n} saisies hors ligne, envoyées dès le retour du réseau`;
+  }
+  async function api(action, data = {}) {
+    const key = QUEUEABLE[action]?.(data);
+    try {
+      const json = await apiSend(action, data);
+      if (key && readQueue().some((i) => i.key === key)) writeQueue(readQueue().filter((i) => i.key !== key)); // valeur plus récente envoyée
+      return json;
+    } catch (err) {
+      if (!key || !(err instanceof TypeError)) throw err; // TypeError : réseau indisponible
+      writeQueue([...readQueue().filter((i) => i.key !== key), { key, action, data }]);
+      return { ok: true, queued: true };
+    }
+  }
+  let flushing = false;
+  async function flushQueue() {
+    if (flushing || !readQueue().length) return;
+    flushing = true;
+    try {
+      for (const item of readQueue()) {
+        await apiSend(item.action, item.data);
+        writeQueue(readQueue().filter((i) => i.key !== item.key));
+      }
+    } catch (e) { /* toujours hors ligne : on réessaiera */ }
+    flushing = false;
+  }
+  showSync(readQueue().length);
+  flushQueue();
+  addEventListener('online', flushQueue);
+  setInterval(flushQueue, 20000);
 
   const fmtClock = (s) => {
     s = Math.max(0, Math.floor(s));
@@ -35,8 +86,11 @@
   }
 
   // --- Minuteur de repos -----------------------------------------------------
+  // L'heure de fin est gardée dans le navigateur : le minuteur reprend après un rechargement.
   const rest = $('#rest');
-  let restEnd = 0, restTotal = 0, restTimer = null;
+  const REST_KEY = 'carnet-rest';
+  const currentWorkout = $('.exlist')?.dataset.workout || null;
+  let restEnd = 0, restTotal = 0, restTimer = null, restCard = null, restNext = '';
   function beep() {
     try {
       const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -60,23 +114,47 @@
       beep();
     }
   }
-  function startRest(seconds) {
+  function saveRest() {
+    try { localStorage.setItem(REST_KEY, JSON.stringify({ end: restEnd, total: restTotal, next: restNext, workout: currentWorkout })); } catch (e) { /* stockage indisponible */ }
+  }
+  // seconds : durée ; next : exercice suivant (repos de transition) ; card : exercice dont on règle le repos entre séries
+  function startRest(seconds, { next = '', card = null, end = 0 } = {}) {
     if (!rest) return;
-    restTotal = seconds; restEnd = Date.now() + seconds * 1000;
-    rest.hidden = false; rest.classList.remove('is-over');
-    $('.rest-label', rest).textContent = 'Repos';
+    restTotal = seconds; restEnd = end || Date.now() + seconds * 1000;
+    restCard = card; restNext = next;
+    rest.hidden = false;
+    rest.classList.toggle('is-over', end > 0 && end <= Date.now()); // reprise d'un repos déjà fini : pas de bip
+    rest.classList.toggle('is-transition', !!next);
+    $('.rest-label', rest).textContent = rest.classList.contains('is-over') ? 'Go !' : next ? 'Transition' : 'Repos';
+    const nx = $('.rest-next', rest);
+    nx.hidden = !next;
+    nx.textContent = next ? 'Ensuite : ' + next : '';
     clearInterval(restTimer);
     renderRest();
     restTimer = setInterval(renderRest, 250);
+    saveRest();
   }
-  function stopRest() { clearInterval(restTimer); if (rest) rest.hidden = true; }
+  function stopRest() {
+    clearInterval(restTimer);
+    if (rest) rest.hidden = true;
+    try { localStorage.removeItem(REST_KEY); } catch (e) { /* stockage indisponible */ }
+  }
+  // Reprise après rechargement (même séance, repos fini depuis moins de 5 min)
+  try {
+    const saved = JSON.parse(localStorage.getItem(REST_KEY) || 'null');
+    if (saved && currentWorkout && saved.workout === currentWorkout && saved.end > Date.now() - 300000) {
+      startRest(saved.total, { next: saved.next, end: saved.end });
+    } else if (saved && (!saved.workout || saved.end < Date.now() - 300000)) localStorage.removeItem(REST_KEY);
+  } catch (e) { /* stockage indisponible */ }
   rest?.addEventListener('click', (e) => {
     const b = e.target.closest('[data-rest]');
     if (!b) return;
     if (b.dataset.rest === 'skip') return stopRest();
     const d = parseInt(b.dataset.rest, 10);
     restEnd += d * 1000; restTotal = Math.max(restTotal + d, 1);
-    rest.classList.remove('is-over'); renderRest();
+    // le repos ajusté reste valable pour les séries suivantes de l'exercice (pour cette séance)
+    if (restCard && !restNext) restCard.dataset.rest = Math.max(15, Math.round(restTotal));
+    rest.classList.remove('is-over'); renderRest(); saveRest();
   });
 
   // --- Glisser-déposer des exercices (séance et programme) -----------------
@@ -314,7 +392,15 @@
         if (done) {
           // dans un superset, pas de repos avant d'avoir fait le tour du groupe
           const chained = card.dataset.ss && supersetNext(card);
-          if (!chained) startRest(parseInt(card.dataset.rest, 10) || 90);
+          if (!chained) {
+            const group = card.dataset.ss ? $$(`.excard[data-ss="${card.dataset.ss}"]`, exlist) : [card];
+            const last = group.at(-1);
+            if (group.every((c) => !$('.set-row[data-set]:not(.is-done)', c))) {
+              // exercice (ou superset) terminé : repos de transition, en annonçant le suivant
+              if (last.dataset.next) startRest(parseInt(last.dataset.restAfter, 10) || 90, { next: last.dataset.next });
+              else stopRest();
+            } else startRest(parseInt(card.dataset.rest, 10) || 90, { card });
+          }
         }
         return;
       }
@@ -341,6 +427,18 @@
         return;
       }
 
+      if (e.target.closest('[data-replace]')) {
+        e.target.closest('details')?.removeAttribute('open');
+        openPicker({ replace: card.dataset.we }, async (exId, name) => {
+          if ($('.set-row.is-done', card) && !confirm('Des séries sont déjà cochées : elles compteront pour « ' + name + ' ». Continuer ?')) return;
+          const template = card.dataset.tpl === '1' && confirm('Utiliser aussi « ' + name + ' » dans le programme à la place de celui-ci ?');
+          await flushSaves();
+          await api('workout_replace_exercise', { we: card.dataset.we, exercise: exId, template: template ? 1 : 0 });
+          await refreshList();
+        });
+        return;
+      }
+
       const mv = e.target.closest('[data-move]');
       if (mv) {
         await api('workout_move_exercise', { we: card.dataset.we, dir: mv.dataset.move });
@@ -361,10 +459,12 @@
 
   // --- Sélecteur d'exercice --------------------------------------------------
   const picker = $('#picker');
-  let onPick = null;
+  let onPick = null, pickMode = null; // pickMode.replace = exercice de séance à remplacer
   async function searchPicker() {
     const q = $('#picker-q').value, muscle = $('#picker-muscle').value;
-    const res = await fetch(`api.php?action=search&q=${encodeURIComponent(q)}&muscle=${encodeURIComponent(muscle)}`);
+    const res = await fetch(pickMode?.replace
+      ? `api.php?action=replace_suggestions&we=${encodeURIComponent(pickMode.replace)}&q=${encodeURIComponent(q)}`
+      : `api.php?action=search&q=${encodeURIComponent(q)}&muscle=${encodeURIComponent(muscle)}`);
     const list = await res.json();
     const box = $('#picker-list');
     box.innerHTML = list.length ? '' : '<p class="empty" style="padding:1rem">Aucun résultat.</p>';
@@ -374,7 +474,7 @@
       b.innerHTML = `${ex.img ? `<img src="${ex.img}" alt="" loading="lazy">` : ''}<span><strong></strong><small class="muted"></small></span>`;
       $('strong', b).textContent = ex.name;
       $('small', b).textContent = ex.sub + (ex.used ? ` · ${ex.used}× fait` : '');
-      b.addEventListener('click', () => onPick?.(ex.id));
+      b.addEventListener('click', () => onPick?.(ex.id, ex.name));
       box.appendChild(b);
     }
   }
@@ -383,19 +483,60 @@
     $('#picker-q').addEventListener('input', () => { clearTimeout(t); t = setTimeout(searchPicker, 200); });
     $('#picker-muscle').addEventListener('change', searchPicker);
   }
+  function openPicker(mode, pick) {
+    pickMode = mode;
+    onPick = async (exId, name) => { picker.close(); await pick(exId, name); };
+    $('#picker-muscle').hidden = !!mode?.replace;
+    $('#picker-q').placeholder = mode?.replace ? 'Alternatives (mêmes muscles) : filtrer par nom…' : 'Rechercher : leg press, curl, squat…';
+    picker.showModal();
+    $('#picker-q').value = '';
+    if (matchMedia('(hover: hover)').matches) $('#picker-q').focus(); // sur mobile, pas de clavier d'office
+    searchPicker();
+  }
   $$('[data-pick]').forEach((btn) => btn.addEventListener('click', () => {
     const kind = btn.dataset.pick, id = btn.dataset.id;
-    onPick = async (exId) => {
-      picker.close();
+    openPicker(null, async (exId) => {
       if (kind === 'workout') await api('workout_add_exercise', { workout: id, exercise: exId });
       else await api('template_add_exercise', { template: id, exercise: exId });
       location.reload();
-    };
-    picker.showModal();
-    $('#picker-q').value = '';
-    $('#picker-q').focus();
-    searchPicker();
+    });
   }));
+
+  // --- Réglages machine : enregistrés au fil de la frappe, propres à chaque compte ---
+  const noteTimers = new Map();
+  document.addEventListener('input', (e) => {
+    const inp = e.target.closest('[data-ex-note]');
+    if (!inp) return;
+    const ex = inp.dataset.exNote;
+    $$(`[data-ex-note="${CSS.escape(ex)}"]`).forEach((o) => { if (o !== inp) o.value = inp.value; }); // même exercice ailleurs dans la page
+    clearTimeout(noteTimers.get(ex));
+    noteTimers.set(ex, setTimeout(() => api('exercise_note', { exercise: ex, note: inp.value }).catch(console.error), 600));
+  });
+
+  // --- Écran toujours allumé pendant une séance en cours (désactivable) ---
+  const wakeBtn = $('[data-wakelock]');
+  if (wakeBtn && 'wakeLock' in navigator) {
+    const KEY = 'carnet-wakelock';
+    let lock = null;
+    const wanted = () => { try { return localStorage.getItem(KEY) !== 'off'; } catch (e) { return true; } };
+    const render = () => {
+      wakeBtn.setAttribute('aria-pressed', String(wanted()));
+      $('span', wakeBtn).textContent = wanted() ? 'Écran toujours allumé' : 'Écran en veille normale';
+    };
+    async function acquire() {
+      if (!wanted() || document.visibilityState !== 'visible' || lock) return;
+      try { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); } catch (e) { /* refusé (batterie faible…) */ }
+    }
+    wakeBtn.hidden = false;
+    wakeBtn.addEventListener('click', () => {
+      try { localStorage.setItem(KEY, wanted() ? 'off' : 'on'); } catch (e) { /* stockage indisponible */ }
+      if (wanted()) acquire(); else lock?.release();
+      render();
+    });
+    document.addEventListener('visibilitychange', acquire);
+    render();
+    acquire();
+  }
 
   // --- Graphiques (Chart.js) -------------------------------------------------
   // Les couleurs viennent des tokens CSS : les graphiques suivent le thème clair/sombre.
@@ -578,7 +719,19 @@ document.querySelectorAll('.act-form').forEach((form) => {
 document.addEventListener('submit', (e) => {
   const msg = e.target.dataset && e.target.dataset.confirm;
   if (msg && !confirm(msg)) e.preventDefault();
+  // Déconnexion : on vide les pages gardées pour le hors ligne (elles appartiennent à ce compte)
+  if (!e.defaultPrevented && /[?&]p=logout\b/.test(e.target.getAttribute('action') || '')) purgeOffline();
 });
+
+// --- Application installable + hors ligne (sw.js) ---------------------------
+function purgeOffline() {
+  try { ['carnet-rest', 'carnet-queue'].forEach((k) => localStorage.removeItem(k)); } catch (e) { /* stockage indisponible */ }
+  if (window.caches) caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+}
+if (document.body.classList.contains('page-login') || document.body.classList.contains('page-register')) purgeOffline();
+else if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('sw.js').catch(() => { /* navigateur sans support : l'app marche en ligne */ });
+}
 document.addEventListener('click', (e) => {
   const openD = e.target.closest('[data-open-dialog]');
   if (openD) { document.getElementById(openD.dataset.openDialog)?.showModal(); return; }

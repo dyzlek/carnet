@@ -25,11 +25,15 @@ $msg = flash();
 <meta name="csrf" content="<?= h(csrf_token()) ?>">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Carnet">
 <script src="assets/theme.js?v=1"></script>
 <link rel="stylesheet" href="assets/fonts.css?v=1">
-<link rel="stylesheet" href="assets/app.css?v=15">
+<link rel="stylesheet" href="assets/app.css?v=17">
 <script src="assets/vendor/chart.umd.min.js?v=4.4.1" defer></script>
-<script src="assets/app.js?v=10" defer></script>
+<script src="assets/app.js?v=11" defer></script>
 </head>
 <body class="page-<?= h($nav) ?><?= $bare ? ' is-bare' : '' ?>">
 <header class="topbar">
@@ -116,6 +120,7 @@ $msg = flash();
 <!-- Minuteur de repos -->
 <div id="rest" class="rest" hidden role="timer" aria-live="off">
   <div class="rest-bar"><span></span></div>
+  <p class="rest-next" hidden></p>
   <div class="rest-body">
     <?= icon('timer') ?>
     <span class="rest-label">Repos</span>

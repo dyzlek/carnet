@@ -13,6 +13,10 @@ const ICONS = [
     'check' => 'M5 12.5l4.5 4.5L19 7.5',
     'x' => 'M6 6l12 12M18 6 6 18',
     'more' => 'M5 12h.01M12 12h.01M19 12h.01',
+    'swap' => 'M4 8h13l-3-3M20 16H7l3 3',
+    'wrench' => 'M7 10h3V7L6.5 3.5a6 6 0 0 1 8 8l6 6a2 2 0 0 1-3 3l-6-6a6 6 0 0 1-8-8z',
+    'wifi-off' => 'M12 18h.01M9.17 15.17a4 4 0 0 1 5.66 0M6.34 12.34a8 8 0 0 1 4.2-2.2M3.5 9.5a12 12 0 0 1 4-2.6M17.66 12.34a8 8 0 0 0-1.4-1.1M20.5 9.5a12 12 0 0 0-8.5-3.5M3 3l18 18',
+    'phone' => 'M7 2h10a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zM11 18h2',
     'grip' => 'M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01',
     'link' => 'M9 15l6-6M11 6l.46-.54a5 5 0 0 1 7.08 7.08l-.54.46M13 18l-.4.53a5.07 5.07 0 0 1-7.12 0 4.97 4.97 0 0 1 0-7.07l.52-.46',
     'unlink' => 'M17 22v-2M9 15l6-6M11 6l.46-.54a5 5 0 0 1 7.08 7.08l-.54.46M13 18l-.4.53a5.07 5.07 0 0 1-7.12 0 4.97 4.97 0 0 1 0-7.07l.52-.46M20 17h2M2 7h2M7 2v2',
@@ -65,10 +69,13 @@ function icon(string $name, string $class = 'icon'): string
  * Jonction entre deux exercices consécutifs : « Lier en superset » ou « Délier ».
  * $attrs porte la cible (data-ss-toggle en séance, name/value du formulaire dans un programme).
  */
-function ss_joint(bool $linked, string $attrs): string
+function ss_joint(bool $linked, string $attrs, ?int $restAfter = null): string
 {
     $type = str_contains($attrs, 'name=') ? 'submit' : 'button';
-    return '<div class="ss-joint' . ($linked ? ' is-linked' : '') . '">'
+    $rest = $restAfter !== null
+        ? '<span class="joint-rest" title="Repos avant l\'exercice suivant">' . icon('timer') . 'Repos ' . fmt_clock($restAfter) . '</span>'
+        : ($linked && !str_contains($attrs, 'name=') ? '<span class="joint-rest is-chain">Sans repos</span>' : '');
+    return '<div class="ss-joint' . ($linked ? ' is-linked' : '') . '">' . $rest
         . '<button type="' . $type . '" class="ss-btn" ' . $attrs . '>'
         . icon($linked ? 'unlink' : 'link') . ($linked ? 'Délier' : 'Lier en superset') . '</button></div>';
 }

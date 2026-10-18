@@ -331,3 +331,73 @@ function search_exercises(string $text, ?string $muscle = null, ?string $equipme
                                           JOIN workouts w ON w.id = we.workout_id WHERE w.user_id = ? GROUP BY we.exercise_id) u ON u.exercise_id = e.id
               WHERE $w ORDER BY used DESC, e.is_custom DESC, (e.name_fr IS NULL), e.name LIMIT $limit OFFSET $offset", array_merge([uid()], $params))->fetchAll();
 }
+
+/** Note de réglage machine de l'utilisateur pour un exercice (« Siège cran 4 »). */
+function exercise_note(string $exerciseId): string
+{
+    return (string)q('SELECT note FROM exercise_notes WHERE user_id = ? AND exercise_id = ?', [uid(), $exerciseId])->fetchColumn();
+}
+
+function save_exercise_note(string $exerciseId, string $note): void
+{
+    $note = preg_match('/^.{0,300}/su', trim($note), $m) ? $m[0] : ''; // 300 caractères max (mbstring n'est pas toujours là)
+    if ($note === '') {
+        q('DELETE FROM exercise_notes WHERE user_id = ? AND exercise_id = ?', [uid(), $exerciseId]);
+        return;
+    }
+    q("INSERT INTO exercise_notes (user_id, exercise_id, note) VALUES (?, ?, ?)
+       ON CONFLICT(user_id, exercise_id) DO UPDATE SET note = excluded.note, updated_at = datetime('now', 'localtime')",
+      [uid(), $exerciseId, $note]);
+}
+
+/** Repos entre séries (s) d'un exercice de séance ; 15 s au minimum pour un « 0 » de superset. */
+function rest_between(array $we): int
+{
+    $r = $we['rest_max'] !== null ? (int)$we['rest_max'] : 90;
+    return $r === 0 ? 15 : $r;
+}
+
+/** Repos avant l'exercice suivant (transition) : réglé dans le programme, sinon le repos entre séries. */
+function rest_after(array $we): int
+{
+    return $we['rest_after'] !== null ? (int)$we['rest_after'] : max(rest_between($we), 90);
+}
+
+/**
+ * Alternatives pour remplacer un exercice : mêmes muscles principaux, ceux déjà pratiqués d'abord,
+ * puis même matériel. $text filtre par nom comme la recherche normale.
+ */
+function replacement_candidates(string $exerciseId, string $text = '', int $limit = 40): array
+{
+    $ex = exercise($exerciseId);
+    $prim = exercise_muscles($exerciseId)['primary'];
+    $rows = [];
+    foreach ($prim ?: [null] as $m) {
+        foreach (search_exercises($text, $m, null, null, 200) as $r) $rows[$r['id']] = $r;
+    }
+    unset($rows[$exerciseId]);
+    $rows = array_values($rows);
+    usort($rows, fn($a, $b) => [(int)$b['used'] > 0, $b['equipment'] === $ex['equipment'], (int)$b['used']]
+                            <=> [(int)$a['used'] > 0, $a['equipment'] === $ex['equipment'], (int)$a['used']]);
+    return array_slice($rows, 0, $limit);
+}
+
+/**
+ * Remplace l'exercice d'une séance en gardant sa place, son superset et la cible du programme.
+ * Les séries pas encore faites reprennent les charges de la dernière fois sur le nouvel exercice.
+ */
+function replace_workout_exercise(array $we, string $exerciseId, bool $updateTemplate): void
+{
+    $w = owned_workout((int)$we['workout_id']);
+    q('UPDATE workout_exercises SET exercise_id = ? WHERE id = ?', [$exerciseId, $we['id']]);
+    $last = last_performance($exerciseId, $w['started_at']);
+    $sets = q('SELECT id, set_number FROM sets WHERE workout_exercise_id = ? AND done = 0 ORDER BY set_number', [$we['id']])->fetchAll();
+    foreach ($sets as $s) {
+        $prev = $last ? ($last['sets'][$s['set_number'] - 1] ?? end($last['sets'])) : null;
+        q('UPDATE sets SET weight = ?, reps = NULL WHERE id = ?', [$prev['weight'] ?? null, $s['id']]);
+    }
+    if ($updateTemplate && $we['template_exercise_id']) {
+        q('UPDATE template_exercises SET exercise_id = ? WHERE id = ? AND template_id IN (SELECT id FROM templates WHERE user_id = ?)',
+          [$exerciseId, $we['template_exercise_id'], uid()]);
+    }
+}

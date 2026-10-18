@@ -129,6 +129,7 @@ function migrate(PDO $pdo): void
     if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 1) migrate_v1($pdo);
     if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 2) migrate_v2($pdo);
     if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 3) migrate_v3($pdo);
+    if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 4) migrate_v4($pdo);
 }
 
 /** Importe le dataset hasaneyldrm/exercises-dataset (data/exercises.json). */
@@ -282,5 +283,23 @@ function migrate_v3(PDO $pdo): void
     foreach ($pdo->query('SELECT id FROM templates')->fetchAll(PDO::FETCH_COLUMN) as $id) ss_from_labels('template', (int)$id);
     foreach ($pdo->query('SELECT id FROM workouts')->fetchAll(PDO::FETCH_COLUMN) as $id) ss_from_labels('workout', (int)$id);
     $pdo->exec('PRAGMA user_version = 3');
+    $pdo->commit();
+}
+
+/** v4 : repos après l'exercice (transition) et notes de réglage machine par utilisateur. */
+function migrate_v4(PDO $pdo): void
+{
+    $pdo->beginTransaction();
+    add_columns($pdo, 'template_exercises', ['rest_after' => 'INTEGER']);
+    $pdo->exec(<<<SQL
+    CREATE TABLE IF NOT EXISTS exercise_notes (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        exercise_id TEXT NOT NULL REFERENCES exercises(id) ON DELETE CASCADE,
+        note TEXT NOT NULL,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        PRIMARY KEY (user_id, exercise_id)
+    );
+    PRAGMA user_version = 4;
+    SQL);
     $pdo->commit();
 }

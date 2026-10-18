@@ -44,7 +44,7 @@ $title = $w['name'];
 $finished = $w['ended_at'] !== null;
 $wes = q('SELECT we.id AS we_id, we.exercise_id, we.label, we.superset_group, we.template_exercise_id,
                  e.name, e.name_fr, e.image, e.equipment,
-                 te.kind, te.focus, te.rpe_min, te.rpe_max, te.sets AS t_sets, te.reps_min, te.reps_max, te.rest_min, te.rest_max, te.notes AS t_notes,
+                 te.kind, te.focus, te.rpe_min, te.rpe_max, te.sets AS t_sets, te.reps_min, te.reps_max, te.rest_min, te.rest_max, te.rest_after, te.notes AS t_notes,
                  te.overload_sets, te.overload_reps, te.inc_min, te.inc_max
           FROM workout_exercises we
           JOIN exercises e ON e.id = we.exercise_id
@@ -59,7 +59,10 @@ $prs = $finished ? workout_prs($w) : [];
     <h1 class="page-title"><?= h($w['name']) ?></h1>
   </div>
   <?php if (!$finished): ?>
-    <div class="timer-big" data-since="<?= h(date('c', strtotime($w['started_at']))) ?>">0:00</div>
+    <div class="workout-live">
+      <div class="timer-big" data-since="<?= h(date('c', strtotime($w['started_at']))) ?>">0:00</div>
+      <button type="button" class="wake-btn" data-wakelock aria-pressed="true" hidden><?= icon('phone') ?><span>Écran toujours allumé</span></button>
+    </div>
   <?php else: ?>
     <span class="tag ok">Terminée</span>
   <?php endif; ?>
@@ -90,13 +93,19 @@ foreach ($wes as $idx => $we):
     $te = $we['template_exercise_id'] ? $we : null;
     $status = overload_status($te, $last);
     $muscles = exercise_muscles($we['exercise_id']);
-    $rest = $we['rest_max'] !== null ? (int)$we['rest_max'] : 90;
-    if ($rest === 0) $rest = 15;
+    $rest = rest_between($we);
+    $note = exercise_note($we['exercise_id']);
     $group = $we['superset_group'];
     $isSuper = $group !== null;
     $prevGroup = $wes[$idx - 1]['superset_group'] ?? null;
     $nextGroup = $wes[$idx + 1]['superset_group'] ?? null;
     $ssFirst = $isSuper && $group !== $prevGroup;
+    $ssLast = !$isSuper || $nextGroup !== $group;
+    // Exercice suivant (après le superset entier) : annoncé par le minuteur de transition
+    $nextWe = null;
+    for ($k = $idx + 1; isset($wes[$k]); $k++) {
+        if (!$isSuper || $wes[$k]['superset_group'] !== $group) { $nextWe = $wes[$k]; break; }
+    }
 ?>
   <?php if ($ssFirst):
       $members = array_values(array_filter($wes, fn($x) => $x['superset_group'] === $group));
@@ -104,7 +113,8 @@ foreach ($wes as $idx => $we):
     <p class="ss-head" data-ss-head="<?= (int)$group ?>"><?= drag_handle('Déplacer le superset') ?><?= icon('link') ?><?= h(ss_title(count($members), $rounds)) ?><span class="muted">enchaîner sans repos, repos après le tour</span></p>
   <?php endif; ?>
   <article class="excard<?= $isSuper ? ' in-superset' : '' ?><?= $ssFirst ? ' ss-first' : '' ?><?= $isSuper && $nextGroup !== $group ? ' ss-last' : '' ?>"
-           data-we="<?= (int)$we['we_id'] ?>" data-rest="<?= $rest ?>"<?= $isSuper ? ' data-ss="' . (int)$group . '"' : '' ?>>
+           data-we="<?= (int)$we['we_id'] ?>" data-tpl="<?= $we['template_exercise_id'] ? 1 : 0 ?>" data-ex="<?= h($we['exercise_id']) ?>" data-rest="<?= $rest ?>" data-rest-after="<?= rest_after($we) ?>"
+           data-next="<?= h($nextWe ? ex_name($nextWe) : '') ?>"<?= $isSuper ? ' data-ss="' . (int)$group . '"' : '' ?>>
     <header class="excard-head">
       <?= drag_handle("Déplacer l'exercice") ?>
       <?php if ($we['label']): ?><span class="badge"><?= h($we['label']) ?></span><?php endif; ?>
@@ -118,6 +128,7 @@ foreach ($wes as $idx => $we):
       <details class="menu">
         <summary aria-label="Options"><?= icon('more') ?></summary>
         <div class="menu-pop">
+          <button type="button" data-replace><?= icon('swap') ?>Remplacer (machine prise)</button>
           <button type="button" data-move="-1"><?= icon('arrow-up') ?>Monter</button>
           <button type="button" data-move="1"><?= icon('arrow-down') ?>Descendre</button>
           <button type="button" class="danger" data-remove><?= icon('trash') ?>Retirer l'exercice</button>
@@ -128,7 +139,7 @@ foreach ($wes as $idx => $we):
     <?php if ($te): ?>
       <div class="target">
         <span><b><?= (int)$we['t_sets'] ?></b> × <b><?= h(fmt_reps($we['reps_min'], $we['reps_max'])) ?></b> reps</span>
-        <span>Repos <b><?= h(fmt_rest($we['rest_min'], $we['rest_max'])) ?></b></span>
+        <span>Repos entre séries <b><?= h(fmt_rest($we['rest_min'], $we['rest_max'])) ?></b></span>
         <?php if ($we['rpe_max'] !== null): ?><span>RPE <b><?= h(fmt_rpe($we['rpe_min'], $we['rpe_max'])) ?></b></span><?php endif; ?>
         <?php if ($we['focus']): ?><span>Cible <b class="plain"><?= h($we['focus']) ?></b></span><?php endif; ?>
         <?php if ($we['t_notes']): ?><span class="target-note"><?= h($we['t_notes']) ?></span><?php endif; ?>
@@ -146,6 +157,11 @@ foreach ($wes as $idx => $we):
       <?php endif; ?>
     <?php endif; ?>
 
+    <label class="ex-note">
+      <span><?= icon('wrench') ?>Réglages</span>
+      <input data-ex-note="<?= h($we['exercise_id']) ?>" value="<?= h($note) ?>" placeholder="Siège cran 4, dossier 2…" maxlength="300" autocomplete="off" enterkeyhint="done">
+    </label>
+
     <p class="last small">
       <?php if ($last): ?>
         <span class="muted">Dernière fois</span> <a href="?p=workout&id=<?= (int)$last['workout_id'] ?>"><?= h(fmt_short_date($last['started_at'])) ?></a> :
@@ -161,7 +177,7 @@ foreach ($wes as $idx => $we):
     </div>
     <button type="button" class="btn ghost sm add-set"><?= icon('plus') ?>Série</button>
   </article>
-  <?php if (isset($wes[$idx + 1])) echo ss_joint($isSuper && $group === $nextGroup, 'data-ss-toggle="' . (int)$we['we_id'] . '"'); ?>
+  <?php if (isset($wes[$idx + 1])) echo ss_joint($isSuper && $group === $nextGroup, 'data-ss-toggle="' . (int)$we['we_id'] . '"', $ssLast ? rest_after($we) : null); ?>
 <?php endforeach; ?>
 </div>
 

@@ -22,12 +22,12 @@ if (is_post()) {
                 q('DELETE FROM template_exercises WHERE id = ? AND template_id = ?', [(int)$rid, $id]);
                 continue;
             }
-            q('UPDATE template_exercises SET kind = ?, focus = ?, sets = ?, reps_min = ?, reps_max = ?, rest_min = ?, rest_max = ?, rpe_min = ?, rpe_max = ?,
+            q('UPDATE template_exercises SET kind = ?, focus = ?, sets = ?, reps_min = ?, reps_max = ?, rest_min = ?, rest_max = ?, rest_after = ?, rpe_min = ?, rpe_max = ?,
                       notes = ?, overload_sets = ?, overload_reps = ?, inc_min = ?, inc_max = ?
                WHERE id = ? AND template_id = ?', [
                 trim((string)$r['kind']) ?: null, trim((string)($r['focus'] ?? '')) ?: null,
                 max(1, $int($r['sets']) ?? 3), $int($r['reps_min']), $int($r['reps_max']),
-                $int($r['rest_min']), $int($r['rest_max']), parse_num($r['rpe_min'] ?? null), parse_num($r['rpe_max'] ?? null), trim((string)$r['notes']) ?: null,
+                parse_secs($r['rest_min'] ?? null), parse_secs($r['rest_max'] ?? null), parse_secs($r['rest_after'] ?? null), parse_num($r['rpe_min'] ?? null), parse_num($r['rpe_max'] ?? null), trim((string)$r['notes']) ?: null,
                 $int($r['overload_sets']), $int($r['overload_reps']), parse_num($r['inc_min']), parse_num($r['inc_max']),
                 (int)$rid, $id,
             ]);
@@ -57,7 +57,7 @@ $rows = template_exercises($id);
     <label>Description <input name="notes" value="<?= h($t['notes']) ?>"></label>
   </div>
 
-  <p class="muted small">Ordre : maintiens la poignée à gauche d'un exercice et fais-le glisser (celle d'un superset déplace tout le groupe). Superset : bouton « Lier en superset » entre deux exercices (2A / 2B, tri-set, circuit). Repos en secondes (« 0 à 15 s » : min 0, max 15). Surcharge : si <i>N</i> séries à <i>X</i> reps sont validées à la charge max, l'app propose +min à +max kg à la séance suivante.</p>
+  <p class="muted small">Ordre : maintiens la poignée à gauche d'un exercice et fais-le glisser (celle d'un superset déplace tout le groupe). Superset : bouton « Lier en superset » entre deux exercices (2A / 2B, tri-set, circuit). Repos en secondes ou en minutes (« 90 » ou « 1:30 ») ; « Repos après l'exercice » = transition avant le suivant (par défaut : le repos entre séries, 1:30 minimum). Surcharge : si <i>N</i> séries à <i>X</i> reps sont validées à la charge max, l'app propose +min à +max kg à la séance suivante.</p>
 
   <div class="tpl-rows">
     <?php foreach ($rows as $i => $r):
@@ -80,8 +80,9 @@ $rows = template_exercises($id);
           <label>Séries <input name="rows[<?= $k ?>][sets]" value="<?= (int)$r['sets'] ?>" inputmode="numeric"></label>
           <label>Reps min <input name="rows[<?= $k ?>][reps_min]" value="<?= h($r['reps_min']) ?>" inputmode="numeric"></label>
           <label>Reps max <input name="rows[<?= $k ?>][reps_max]" value="<?= h($r['reps_max']) ?>" inputmode="numeric"></label>
-          <label>Repos min (s) <input name="rows[<?= $k ?>][rest_min]" value="<?= h($r['rest_min']) ?>" inputmode="numeric"></label>
-          <label>Repos max (s) <input name="rows[<?= $k ?>][rest_max]" value="<?= h($r['rest_max']) ?>" inputmode="numeric"></label>
+          <label>Repos min <input name="rows[<?= $k ?>][rest_min]" value="<?= h(secs_in($r['rest_min'])) ?>" placeholder="1:30" inputmode="decimal"></label>
+          <label>Repos max <input name="rows[<?= $k ?>][rest_max]" value="<?= h(secs_in($r['rest_max'])) ?>" placeholder="1:30" inputmode="decimal"></label>
+          <label>Repos après l'exercice <input name="rows[<?= $k ?>][rest_after]" value="<?= h(secs_in($r['rest_after'])) ?>" placeholder="<?= h(secs_in(max((int)($r['rest_max'] ?? 90), 90))) ?>" inputmode="decimal"></label>
           <label>RPE min <input name="rows[<?= $k ?>][rpe_min]" value="<?= h(num_in($r['rpe_min'])) ?>" inputmode="decimal"></label>
           <label>RPE max <input name="rows[<?= $k ?>][rpe_max]" value="<?= h(num_in($r['rpe_max'])) ?>" inputmode="decimal"></label>
           <label class="full">Consigne <input name="rows[<?= $k ?>][notes]" value="<?= h($r['notes']) ?>"></label>
@@ -92,7 +93,7 @@ $rows = template_exercises($id);
           <label class="check-del"><input type="checkbox" name="rows[<?= $k ?>][delete]" value="1"> Retirer</label>
         </div>
       </fieldset>
-      <?php if (isset($rows[$i + 1])) echo ss_joint($g !== null && $g === $nextG, 'name="ss_toggle" value="' . $k . '"'); ?>
+      <?php if (isset($rows[$i + 1])) echo ss_joint($g !== null && $g === $nextG, 'name="ss_toggle" value="' . $k . '"', $ssLast ? rest_after($r) : null); ?>
     <?php endforeach; ?>
   </div>
 

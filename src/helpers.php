@@ -49,6 +49,27 @@ function num_in($n): string
     return $s;
 }
 
+/** Durée saisie en secondes (« 90 ») ou en minutes:secondes (« 1:30 »). */
+function parse_secs($v): ?int
+{
+    $v = trim((string)$v);
+    if (preg_match('/^(\d{1,3}):([0-5]\d)$/', $v, $m)) return (int)$m[1] * 60 + (int)$m[2];
+    return ($n = parse_num($v)) === null ? null : max(0, (int)round($n));
+}
+
+/** Secondes → « 1:30 » (champ de saisie). */
+function secs_in(?int $s): string
+{
+    if ($s === null) return '';
+    return $s < 60 ? (string)$s : intdiv($s, 60) . ':' . str_pad((string)($s % 60), 2, '0', STR_PAD_LEFT);
+}
+
+/** Secondes → « 1:30 » pour l'affichage d'un repos (« 45 s » sous la minute). */
+function fmt_clock(int $s): string
+{
+    return $s < 60 ? $s . ' s' : intdiv($s, 60) . ':' . str_pad((string)($s % 60), 2, '0', STR_PAD_LEFT);
+}
+
 function parse_num($v): ?float
 {
     if ($v === null) return null;

@@ -348,7 +348,11 @@ a.chip:hover { border-color: var(--line-strong); color: var(--text); }
 .ss-head .icon { width: 15px; height: 15px; }
 .ss-head .muted { margin-left: auto; font: 400 .8rem var(--body, inherit); text-transform: none; letter-spacing: 0; }
 /* Jonction entre deux exercices : bouton discret « Lier en superset », ou couture du groupe avec « Délier » */
-.ss-joint { position: relative; display: flex; justify-content: center; align-items: center; min-height: 44px; }
+.ss-joint { position: relative; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px var(--s2); min-height: 44px; padding: 6px 0; }
+/* Repos de transition entre deux exercices (ou « Sans repos » dans un superset) */
+.joint-rest { position: relative; display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 4px 10px; border-radius: 999px; background: var(--surface-2); color: var(--text); font: 600 .74rem var(--mono); letter-spacing: .02em; }
+.joint-rest .icon { width: 14px; height: 14px; color: var(--accent-text); }
+.joint-rest.is-chain { background: var(--surface); color: var(--accent-text); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
 .ss-joint.is-linked { background: var(--surface); border-right: 1px solid var(--line); border-left: 3px solid var(--accent); }
 .ss-joint.is-linked::before { content: ''; position: absolute; left: var(--s4); right: var(--s4); top: 50%; border-top: 1px dashed var(--line-strong); }
 .ss-btn { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 12px; border: 1px dashed var(--line-strong); border-radius: 999px; background: var(--bg); color: var(--muted); font: 500 .7rem var(--mono); text-transform: uppercase; letter-spacing: .06em; cursor: pointer; transition: color .15s var(--ease), border-color .15s var(--ease); }
@@ -468,6 +472,9 @@ a.chip:hover { border-color: var(--line-strong); color: var(--text); }
 .rest-label { color: var(--muted); font: 500 .72rem var(--mono); text-transform: uppercase; letter-spacing: .08em; }
 .rest-time { font: 500 2rem/1 var(--mono); letter-spacing: -.05em; margin-right: auto; font-variant-numeric: tabular-nums; }
 .rest.is-over { border-color: var(--ok); }
+.rest-next { margin: 0; padding: 8px 12px 0; font-size: .86rem; font-weight: 600; color: var(--accent-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rest.is-transition .rest-bar span { background: var(--ok); }
+@media (max-width: 480px) { .rest-label { display: none; } .rest.is-over .rest-label { display: inline; } .rest-time { font-size: 1.8rem; } }
 .rest.is-over .rest-time, .rest.is-over .rest-label { color: var(--ok); }
 
 /* --- Sélecteur / modales -------------------------------------------------- */
@@ -733,3 +740,19 @@ dialog::backdrop { background: rgba(10, 9, 7, .6); backdrop-filter: blur(2px); }
   .viewer-head { padding: var(--s3) var(--s3) var(--s2) var(--s4); }
 }
 @media (prefers-reduced-motion: reduce) { .viewer-stage img, .viewer-stage canvas { transition: none; } }
+
+/* --- v1.1 : réglages machine, écran allumé, hors ligne --------------------- */
+.ex-note { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3); }
+.ex-note > span { display: inline-flex; align-items: center; gap: 5px; flex: none; color: var(--muted); font: 500 .7rem var(--mono); text-transform: uppercase; letter-spacing: .06em; }
+.ex-note input { flex: 1; min-width: 0; min-height: 40px; padding: 8px 10px; font-size: 1rem; background: var(--surface-2); border-color: transparent; }
+.ex-note input:focus { border-color: var(--accent); }
+.ex-hero .ex-note { max-width: 520px; }
+.workout-live { display: grid; justify-items: end; gap: 6px; }
+.wake-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font: 500 .72rem var(--mono); cursor: pointer; }
+.wake-btn[aria-pressed="true"] { color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.wake-btn .icon { width: 14px; height: 14px; }
+.sync-bar { position: fixed; left: 12px; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 30; padding: 10px 14px; border-radius: var(--r-sm); background: var(--text); color: var(--bg); font-size: .86rem; font-weight: 600; text-align: center; box-shadow: 0 8px 24px rgb(0 0 0 / .3); }
+.picker-head:has(select[hidden]) { grid-template-columns: 1fr auto; }
+@media (min-width: 861px) {
+  .sync-bar { left: auto; right: 24px; bottom: 24px; max-width: 360px; }
+}
