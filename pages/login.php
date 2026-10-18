@@ -1,0 +1,25 @@
+<?php
+defined('ROOT') || exit; // pas d'accès direct
+$error = null;
+$email = '';
+if (is_post()) {
+    $email = (string)($_POST['email'] ?? '');
+    $error = attempt_login($email, (string)($_POST['password'] ?? ''));
+    if ($error === null) redirect('./');
+}
+$title = 'Connexion';
+?>
+<div class="auth">
+  <p class="eyebrow">Carnet d'entraînement</p>
+  <h1 class="page-title">Connexion</h1>
+
+  <?php if ($error): ?><div class="form-error" role="alert"><?= icon('x') ?><?= h($error) ?></div><?php endif; ?>
+
+  <form method="post" class="form-grid" novalidate>
+    <label>E-mail <input type="email" name="email" value="<?= h($email) ?>" autocomplete="username" required autofocus></label>
+    <label>Mot de passe <input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn big">Se connecter</button>
+  </form>
+
+  <?php if (registration_open()): ?><p class="auth-alt">Pas encore de compte ? <a href="?p=register">Créer un compte</a></p><?php endif; ?>
+</div>

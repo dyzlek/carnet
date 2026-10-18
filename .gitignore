@@ -1,0 +1,16 @@
+# Données locales (base, sessions, sauvegardes, journaux)
+data/*.sqlite
+data/*.sqlite-wal
+data/*.sqlite-shm
+data/sessions/
+data/backups/
+data/*.log
+# Paquets générés et notes de dev
+dist/
+.claude/
+
+# Divers
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

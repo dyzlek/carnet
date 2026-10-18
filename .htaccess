@@ -1,0 +1,32 @@
+# Carnet : protections Apache 2.4 (hébergement mutualisé ou serveur dédié).
+# Idéal : faire pointer la racine web vers ce dossier et garder data/ inaccessible (règles ci-dessous).
+
+Options -Indexes
+DirectoryIndex index.php
+AddDefaultCharset utf-8
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # Dossiers internes : base SQLite, sessions, code, outils, notes de dev
+  RewriteRule ^(data|src|pages|tools|dist|\.claude)(/|$) - [F,L]
+  # Fichiers cachés (.git, .env…), sauf .well-known (certificats Let's Encrypt)
+  RewriteRule (^|/)\.(?!well-known/) - [F,L]
+</IfModule>
+
+# Fichiers sensibles même si mod_rewrite est absent
+<FilesMatch "(\.(md|bat|sh|sqlite|sqlite-wal|sqlite-shm|log|ini|lock|dist)$|^router\.php$)">
+  Require all denied
+</FilesMatch>
+
+# Cache navigateur pour les fichiers statiques (versionnés par ?v=)
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 30 days"
+  ExpiresByType application/javascript "access plus 30 days"
+  ExpiresByType text/javascript "access plus 30 days"
+  ExpiresByType font/woff2 "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 30 days"
+</IfModule>
+<IfModule mod_mime.c>
+  AddType font/woff2 .woff2
+</IfModule>
