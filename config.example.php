@@ -9,3 +9,6 @@ define('DB_HOST', 'localhost');      // « Serveur » affiché en haut de phpMyA
 define('DB_NAME', 'dylan.belledent'); // nom de la base, colonne de gauche de phpMyAdmin
 define('DB_USER', 'dylan.belledent'); // identifiant MySQL (souvent le même que pour phpMyAdmin)
 define('DB_PASS', '');               // mot de passe MySQL : à écrire uniquement sur le serveur
+// Facultatif : préfixe des tables de Carnet (« carnet_users », « carnet_sets »…), pour cohabiter
+// avec d'autres projets dans la même base. Par défaut « carnet_ ».
+// define('DB_PREFIX', 'carnet_');
