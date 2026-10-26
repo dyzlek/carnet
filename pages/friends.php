@@ -36,6 +36,9 @@ if (is_post()) {
             friend_remove((int)($_POST['user'] ?? 0));
             flash($fromRequests ? 'Demande annulée.' : 'Ami retiré.');
             redirect('?p=friends&tab=' . ($fromRequests ? 'requests' : 'friends'));
+        case 'kudos': // sans JavaScript (avec JS : api.php) ; retour sur la même page du fil
+            if (toggle_kudos((int)($_POST['workout'] ?? 0))['count'] < 0) flash('Kudos impossible : séance introuvable.');
+            redirect('?p=friends&tab=feed' . (($_GET['before'] ?? '') !== '' ? '&before=' . urlencode((string)$_GET['before']) : ''));
         case 'invite':
             $_SESSION['new_invite'] = create_invite();
             redirect('?p=friends&tab=friends#invite');
@@ -75,12 +78,17 @@ unset($_SESSION['new_invite']);
       <a class="btn ghost" href="?p=friends&amp;tab=friends"><?= icon('users') ?><?= $friends ? 'Mes amis' : 'Ajouter un ami' ?></a>
     </section>
   <?php else: ?>
-    <div class="feed">
-      <?php foreach ($items as $w) echo workout_card($w); ?>
+    <div class="feed-layout">
+      <div>
+        <div class="feed">
+          <?php foreach ($items as $w) echo workout_card($w); ?>
+        </div>
+        <?php if ($more): $last = end($items); ?>
+          <p class="feed-more"><a class="btn ghost" href="?p=friends&amp;tab=feed&amp;before=<?= urlencode($last['started_at']) ?>">Charger plus</a></p>
+        <?php endif; ?>
+      </div>
+      <?php require __DIR__ . '/_feed_side.php'; ?>
     </div>
-    <?php if ($more): $last = end($items); ?>
-      <p class="feed-more"><a class="btn ghost" href="?p=friends&amp;tab=feed&amp;before=<?= urlencode($last['started_at']) ?>">Charger plus</a></p>
-    <?php endif; ?>
   <?php endif; ?>
 
 <?php elseif ($tab === 'friends'): ?>

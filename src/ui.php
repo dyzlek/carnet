@@ -224,8 +224,8 @@ function body_map(array $stats, int $days, bool $compact = false): string
     return $html . '</div>';
 }
 
-/** Classement des muscles avec la zone conseillée (10–20 séries / semaine) rapportée à la période. */
-function muscle_bars(array $stats, int $days, int $limit = 0): string
+/** Classement des muscles avec la zone conseillée (10–20 séries / semaine) rapportée à la période. $links = false : texte simple (profil d'un ami, le catalogue lié serait le mien). */
+function muscle_bars(array $stats, int $days, int $limit = 0, bool $links = true): string
 {
     $rows = array_filter($stats, fn($s, $k) => $k !== 'cardio' && $s['sets'] > 0, ARRAY_FILTER_USE_BOTH);
     if (!$rows) return '<p class="empty">Aucune série enregistrée sur la période.</p>';
@@ -238,10 +238,11 @@ function muscle_bars(array $stats, int $days, int $limit = 0): string
     foreach ($rows as $k => $s) {
         $zone = volume_zone($s['sets'] / $factor);
         $key = in_array($k, ['dorsaux', 'haut_dos'], true) ? 'dos' : $k;
-        $html .= '<li data-m="' . $key . '"><a href="?p=exercises&amp;muscle=' . $k . '">'
+        $open = $links ? '<a href="?p=exercises&amp;muscle=' . $k . '">' : '<div class="mb-row">';
+        $html .= '<li data-m="' . $key . '">' . $open
             . '<span class="mb-name" title="' . h(muscle_label($k)) . '">' . h(muscle_label($k)) . '</span>'
             . '<span class="mb-track"><span class="mb-fill z-' . $zone . '" style="width:' . round($s['sets'] / $max * 100, 1) . '%"></span></span>'
-            . '<span class="mb-val">' . fmt_num($s['sets']) . '</span></a></li>';
+            . '<span class="mb-val">' . fmt_num($s['sets']) . '</span>' . ($links ? '</a>' : '</div>') . '</li>';
     }
     return $html . '</ol>';
 }
@@ -252,12 +253,13 @@ function avatar(string $name, string $class = ''): string
     return '<span class="avatar' . ($class ? ' ' . $class : '') . '" aria-hidden="true">' . h(preg_match('/./us', $name, $m) ? strtoupper($m[0]) : '?') . '</span>';
 }
 
-/** Bouton kudos (AJAX, voir app.js) : aria-pressed = j'ai donné mon kudos. */
+/** Bouton kudos : formulaire POST (marche sans JS, traité par la page) que app.js intercepte pour l'AJAX. aria-pressed = j'ai donné mon kudos. */
 function kudos_button(array $w): string
 {
     $on = !empty($w['i_kudoed']);
-    return '<button type="button" class="kudos-btn" data-kudos="' . (int)$w['id'] . '" aria-pressed="' . ($on ? 'true' : 'false') . '" aria-label="Kudos">'
-        . icon('heart') . '<span class="kudos-n">' . (int)$w['kudos'] . '</span></button>';
+    return '<form method="post" class="kudos-form"><input type="hidden" name="action" value="kudos"><input type="hidden" name="workout" value="' . (int)$w['id'] . '">'
+        . '<button class="kudos-btn" data-kudos="' . (int)$w['id'] . '" aria-pressed="' . ($on ? 'true' : 'false') . '" aria-label="Kudos">'
+        . icon('heart') . '<span class="kudos-n">' . (int)$w['kudos'] . '</span></button></form>';
 }
 
 /** Carte d'une séance du fil d'activité (soi ou un ami), telle que renvoyée par feed() / friend_profile(). */

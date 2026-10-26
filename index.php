@@ -24,7 +24,17 @@ if (!$user && !in_array($page, PUBLIC_PAGES, true)) {
     redirect(users_count() === 0 ? '?p=register' : '?p=login');
 }
 if ($user && in_array($page, PUBLIC_PAGES, true)) {
-    redirect('./');
+    // Lien d'invitation ouvert en étant déjà connecté : on devient ami avec l'inviteur plutôt que d'ignorer le lien
+    $token = (string)($_GET['invite'] ?? '');
+    if ($token === '') redirect('./');
+    $r = accept_invite($token);
+    flash(match ($r['status']) {
+        'ok' => 'Tu es maintenant ami avec ' . $r['name'] . '.',
+        'already' => 'Tu es déjà ami avec ' . $r['name'] . '.',
+        'self' => "C'est ton propre lien d'invitation : envoie-le à un ami.",
+        default => "Ce lien d'invitation n'est plus valable : il a expiré ou a déjà été utilisé.",
+    });
+    redirect('?p=friends&tab=friends');
 }
 
 $title = 'Carnet';

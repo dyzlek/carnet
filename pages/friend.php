@@ -25,6 +25,9 @@ if ($wid) {
                 $commentError = add_comment($wid, (string)($_POST['body'] ?? ''));
                 if ($commentError === null) redirect("?p=friend&workout=$wid#comments");
                 break;
+            case 'kudos': // sans JavaScript (avec JS : api.php)
+                if (toggle_kudos($wid)['count'] < 0) flash('Kudos impossible : séance introuvable.');
+                redirect("?p=friend&workout=$wid#comments");
             case 'delete_comment':
                 delete_comment((int)($_POST['id'] ?? 0));
                 redirect("?p=friend&workout=$wid#comments");
@@ -53,7 +56,7 @@ if ($wid) {
     <h2><?= icon('trophy') ?> Records battus</h2>
     <ul class="plain">
       <?php foreach ($w['prs'] as $p): ?>
-        <li><strong><?= h($p['name']) ?></strong> — <?= h($p['what']) ?> <span class="accent"><?= h($p['value']) ?></span> <span class="muted">(avant : <?= h($p['before']) ?>)</span></li>
+        <li><strong><?= h($p['name']) ?></strong> — <?= h($p['what']) ?> <span class="accent"><?= h($p['value']) ?></span> <?php if (isset($p['before'])): ?><span class="muted">(avant : <?= h($p['before']) ?>)</span><?php endif; ?></li>
       <?php endforeach; ?>
     </ul>
   </section>
@@ -122,6 +125,10 @@ if ($wid) {
 $p = friend_profile($fid);
 if (!$p) { not_found_friend(); return; }
 
+if (is_post() && ($_POST['action'] ?? '') === 'kudos') { // sans JavaScript ; toggle_kudos recontrôle l'accès
+    if (toggle_kudos((int)($_POST['workout'] ?? 0))['count'] < 0) flash('Kudos impossible : séance introuvable.');
+    redirect("?p=friend&id=$fid");
+}
 if (is_post() && ($_POST['action'] ?? '') === 'remove') {
     friend_remove($fid);
     flash($p['name'] . ' a été retiré de tes amis.');
@@ -181,7 +188,7 @@ $level = $p['share_level'];
       <?php if ($level === 'full'): ?>
         <section class="card">
           <h2>Muscles · 30 jours</h2>
-          <?= muscle_bars($p['muscles'], 30, 8) ?>
+          <?= muscle_bars($p['muscles'], 30, 8, false) ?>
         </section>
       <?php else: ?>
         <section class="card">
