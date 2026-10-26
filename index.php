@@ -1,7 +1,7 @@
 <?php
 require __DIR__ . '/src/bootstrap.php';
 
-const PAGES = ['dashboard', 'start', 'workout', 'workouts', 'muscles', 'exercises', 'exercise', 'templates', 'template', 'body', 'account', 'activities', 'activity'];
+const PAGES = ['dashboard', 'start', 'workout', 'workouts', 'muscles', 'exercises', 'exercise', 'templates', 'template', 'body', 'account', 'activities', 'activity', 'friends', 'friend', 'feed'];
 const PUBLIC_PAGES = ['login', 'register'];
 
 $page = $_GET['p'] ?? 'dashboard';

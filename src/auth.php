@@ -26,9 +26,10 @@ function start_session(): void
     session_start();
 }
 
-function current_user(): ?array
+function current_user(bool $refresh = false): ?array
 {
     static $user = false;
+    if ($refresh) $user = false; // changement de compte en cours de requête (tests)
     if ($user !== false) return $user;
     $id = $_SESSION['uid'] ?? null;
     $user = $id ? (q('SELECT id, email, name, created_at FROM users WHERE id = ?', [$id])->fetch() ?: null) : null;
@@ -66,12 +67,16 @@ function set_registration(bool $open): void
     q(upsert_sql('settings', ['key', 'value'], ['key'], ['value']), ['registration', $open ? 'open' : 'closed']);
 }
 
-/** Retourne une liste d'erreurs (vide = compte créé et connecté). */
-function register(string $name, string $email, string $password, string $confirm): array
+/**
+ * Retourne une liste d'erreurs (vide = compte créé et connecté).
+ * Un jeton d'invitation valide permet de s'inscrire même quand les inscriptions sont fermées.
+ */
+function register(string $name, string $email, string $password, string $confirm, ?string $inviteToken = null): array
 {
     $name = trim($name);
     $email = normalize_email($email);
-    if (!registration_open()) return ['Les inscriptions sont fermées.'];
+    $invite = $inviteToken !== null && $inviteToken !== '' ? invite_by_token($inviteToken) : null;
+    if (!$invite && !registration_open()) return ['Les inscriptions sont fermées.'];
     $errors = [];
     if ($name === '' || strlen($name) > 60) $errors[] = 'Indique un prénom ou pseudo (60 caractères max).';
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Adresse e-mail invalide.';
@@ -87,6 +92,7 @@ function register(string $name, string $email, string $password, string $confirm
     $uid = (int)$pdo->lastInsertId();
     if (users_count() === 1) claim_orphans($pdo, $uid);
     seed_programs($pdo, $uid);
+    if ($invite) consume_invite($invite['token'], $uid);
     log_in($uid);
     return [];
 }
@@ -189,6 +195,6 @@ function delete_account(int $uid): void
     q('DELETE FROM workouts WHERE user_id = ?', [$uid]);      // séances → exercices de séance → séries (cascade)
     q('DELETE FROM templates WHERE user_id = ?', [$uid]);
     q('DELETE FROM exercises WHERE owner_id = ?', [$uid]);
-    q('DELETE FROM users WHERE id = ?', [$uid]);              // pesées, mensurations, réglages (cascade)
+    q('DELETE FROM users WHERE id = ?', [$uid]);              // pesées, mensurations, réglages, amitiés, invitations, kudos, commentaires (cascade)
     $pdo->commit();
 }

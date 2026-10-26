@@ -180,14 +180,14 @@ function workout_totals(int $workoutId): array
  * Séries par muscle sur une période. Muscle principal = 1 série, secondaire = 0,5.
  * Retour : [muscle => ['sets', 'volume', 'workouts' => [ids], 'last']] trié par séries.
  */
-function muscle_stats(string $from, string $to): array
+function muscle_stats(string $from, string $to, ?int $userId = null): array
 {
     $rows = q('SELECT em.muscle, em.role, s.weight, s.reps, w.id AS wid, w.started_at
                FROM sets s
                JOIN workout_exercises we ON we.id = s.workout_exercise_id
                JOIN workouts w ON w.id = we.workout_id
                JOIN exercise_muscles em ON em.exercise_id = we.exercise_id
-               WHERE s.reps > 0 AND w.user_id = ? AND w.started_at >= ? AND w.started_at < ?', [uid(), $from, $to]);
+               WHERE s.reps > 0 AND w.user_id = ? AND w.started_at >= ? AND w.started_at < ?', [$userId ?? uid(), $from, $to]);
     $out = [];
     foreach ($rows as $r) {
         $f = $r['role'] === 'primary' ? 1.0 : 0.5;
@@ -268,6 +268,7 @@ function exercise_records(array $history): array
 /** Records battus pendant une séance (charge max ou 1RM estimé supérieur à tout l'historique antérieur). */
 function workout_prs(array $workout): array
 {
+    $owner = (int)($workout['user_id'] ?? uid()); // séance d'un ami : l'historique comparé est le sien
     $prs = [];
     $wes = q('SELECT we.id, we.exercise_id, e.name, e.name_fr FROM workout_exercises we JOIN exercises e ON e.id = we.exercise_id
               WHERE we.workout_id = ?', [$workout['id']])->fetchAll();
@@ -276,7 +277,7 @@ function workout_prs(array $workout): array
         if (!$sets) continue;
         $prev = q('SELECT MAX(s.weight) AS top, MAX(s.weight * (1 + s.reps / 30.0)) AS e1
                    FROM sets s JOIN workout_exercises x ON x.id = s.workout_exercise_id JOIN workouts w ON w.id = x.workout_id
-                   WHERE x.exercise_id = ? AND s.reps > 0 AND w.started_at < ? AND w.user_id = ?', [$we['exercise_id'], $workout['started_at'], uid()])->fetch();
+                   WHERE x.exercise_id = ? AND s.reps > 0 AND w.started_at < ? AND w.user_id = ?', [$we['exercise_id'], $workout['started_at'], $owner])->fetch();
         if ($prev['top'] === null) continue; // première fois : pas un record
         $top = max(array_map(fn($s) => (float)$s['weight'], $sets));
         $e1 = max(array_map(fn($s) => e1rm((float)$s['weight'], (int)$s['reps']), $sets));

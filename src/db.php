@@ -51,7 +51,8 @@ function db(): PDO
 final class PrefixedPDO extends PDO
 {
     private const TABLES = 'users|settings|user_settings|login_attempts|exercises|exercise_muscles|exercise_notes|templates|'
-        . 'template_exercises|workouts|workout_exercises|sets|bodyweight|measurements|activities';
+        . 'template_exercises|workouts|workout_exercises|sets|bodyweight|measurements|activities|'
+        . 'friendships|invites|workout_reactions|workout_comments';
 
     public static function prefix(string $sql): string
     {
@@ -224,6 +225,7 @@ function migrate(PDO $pdo): void
     if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 2) migrate_v2($pdo);
     if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 3) migrate_v3($pdo);
     if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 4) migrate_v4($pdo);
+    if ((int)$pdo->query('PRAGMA user_version')->fetchColumn() < 5) migrate_v5($pdo);
 }
 
 /** Importe le dataset hasaneyldrm/exercises-dataset (data/exercises.json). */
@@ -399,8 +401,53 @@ function migrate_v4(PDO $pdo): void
 }
 
 /**
- * MySQL / MariaDB : création directe du schéma actuel (équivalent de SQLite après migrate_v4).
- * La version est gardée dans settings.schema_version pour les migrations futures.
+ * v5 : amis (demandes + amitiés), liens d'invitation, kudos et commentaires sur les séances.
+ * Le niveau de partage (share_level) vit dans user_settings, sans table dédiée.
+ */
+function migrate_v5(PDO $pdo): void
+{
+    $pdo->beginTransaction();
+    $pdo->exec(<<<SQL
+    CREATE TABLE IF NOT EXISTS friendships (
+        id INTEGER PRIMARY KEY,
+        requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        addressee_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted')),
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        UNIQUE (requester_id, addressee_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships(addressee_id, status);
+    CREATE TABLE IF NOT EXISTS invites (
+        id INTEGER PRIMARY KEY,
+        token TEXT NOT NULL UNIQUE,
+        inviter_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        expires_at TEXT NOT NULL,
+        used_by INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS workout_reactions (
+        workout_id INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        PRIMARY KEY (workout_id, user_id)
+    );
+    CREATE TABLE IF NOT EXISTS workout_comments (
+        id INTEGER PRIMARY KEY,
+        workout_id INTEGER NOT NULL REFERENCES workouts(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        body TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_wcomments_workout ON workout_comments(workout_id, created_at);
+    PRAGMA user_version = 5;
+    SQL);
+    $pdo->commit();
+}
+
+/**
+ * MySQL / MariaDB : création directe du schéma de départ (équivalent de SQLite après migrate_v4), puis les
+ * migrations suivantes. La version est gardée dans settings.schema_version ; chaque étape est idempotente
+ * (CREATE TABLE IF NOT EXISTS) pour qu'un échec en cours de route puisse être rejoué.
  */
 function migrate_mysql(PDO $pdo): void
 {
@@ -528,8 +575,55 @@ function migrate_mysql(PDO $pdo): void
         foreach ($tables as $sql) $pdo->exec("$sql $opts");
         $pdo->exec("INSERT INTO settings (`key`, value) VALUES ('schema_version', '4')");
     }
+    $version = (int)$pdo->query("SELECT value FROM settings WHERE `key` = 'schema_version'")->fetchColumn();
+    if ($version < 5) migrate_mysql_v5($pdo);
+
     if ((int)$pdo->query('SELECT COUNT(*) FROM exercises')->fetchColumn() === 0) {
         import_exercises($pdo, DATA_DIR . '/exercises.json');
     }
     $pdo->exec("UPDATE exercises SET name = REPLACE(name, 'в°', '°') WHERE name LIKE '%в°%'");
+}
+
+/** MySQL v5 : amis, invitations, kudos, commentaires (voir migrate_v5). */
+function migrate_mysql_v5(PDO $pdo): void
+{
+    $opts = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+    $tables = [
+        "CREATE TABLE IF NOT EXISTS friendships (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            requester_id INT NOT NULL,
+            addressee_id INT NOT NULL,
+            status VARCHAR(10) NOT NULL DEFAULT 'pending',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (requester_id, addressee_id),
+            INDEX idx_friendships_addressee (addressee_id, status),
+            FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (addressee_id) REFERENCES users(id) ON DELETE CASCADE)",
+        "CREATE TABLE IF NOT EXISTS invites (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            token VARCHAR(64) NOT NULL UNIQUE,
+            inviter_id INT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            expires_at VARCHAR(19) NOT NULL,
+            used_by INT NULL,
+            FOREIGN KEY (inviter_id) REFERENCES users(id) ON DELETE CASCADE)",
+        "CREATE TABLE IF NOT EXISTS workout_reactions (
+            workout_id INT NOT NULL,
+            user_id INT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (workout_id, user_id),
+            FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+        "CREATE TABLE IF NOT EXISTS workout_comments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            workout_id INT NOT NULL,
+            user_id INT NOT NULL,
+            body TEXT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_wcomments_workout (workout_id, created_at),
+            FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)",
+    ];
+    foreach ($tables as $sql) $pdo->exec("$sql $opts");
+    $pdo->exec("REPLACE INTO settings (`key`, value) VALUES ('schema_version', '5')");
 }

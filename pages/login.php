@@ -8,6 +8,8 @@ if (is_post()) {
     if ($error === null) redirect('./');
 }
 $title = 'Connexion';
+$token = (string)($_GET['invite'] ?? '');
+$invQs = preg_match('/^[0-9a-f]{64}$/', $token) ? '&amp;invite=' . $token : ''; // le lien d'invitation survit au détour par la connexion
 ?>
 <div class="auth">
   <p class="eyebrow">Carnet d'entraînement</p>
@@ -21,6 +23,6 @@ $title = 'Connexion';
     <button class="btn big">Se connecter</button>
   </form>
 
-  <p class="auth-alt">Pas encore de compte ? <a href="?p=register">Créer un compte</a>
+  <p class="auth-alt">Pas encore de compte ? <a href="?p=register<?= $invQs ?>">Créer un compte</a>
     <?php if (!registration_open()): ?><br><span class="small">Les inscriptions sont fermées pour l'instant : l'administrateur peut les ouvrir dans Mon compte.</span><?php endif; ?></p>
 </div>

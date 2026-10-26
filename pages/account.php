@@ -47,6 +47,11 @@ if (is_post()) {
             }
             redirect('?p=account');
 
+        case 'share':
+            set_share_level((string)($_POST['level'] ?? ''));
+            flash('Partage mis à jour.');
+            redirect('?p=account#partage');
+
         case 'delete':
             if (!check_password((string)($_POST['password'] ?? ''))) {
                 $errors['delete'][] = 'Mot de passe incorrect.';
@@ -135,6 +140,35 @@ function form_errors(array $errors, string $key): string
   </form>
 </section>
 <?php endif; ?>
+
+<?php
+$shareLevel = share_level();
+$shareOptions = [
+    'none' => ['Rien', 'Tes amis ne voient aucune de tes séances. Tu vois toujours les leurs.'],
+    'summary' => ['Résumé', 'Tes séances terminées : nom, date, durée, nombre d\'exercices et de séries, volume total et records battus.'],
+    'full' => ['Détaillé', 'Le résumé, plus le détail des exercices avec charges et répétitions, et les muscles travaillés sur 30 jours.'],
+];
+?>
+<section class="card" id="partage">
+  <h2><?= icon('users') ?> Partage avec mes amis</h2>
+  <p class="muted">Choisis ce que tes amis peuvent voir. Ton poids et tes mensurations ne sont jamais partagés, quel que soit le niveau.</p>
+  <form method="post" class="form-grid">
+    <input type="hidden" name="action" value="share">
+    <fieldset class="share-pick">
+      <legend>Niveau de partage</legend>
+      <?php foreach ($shareOptions as $k => [$label, $desc]): ?>
+        <label class="share-opt">
+          <input type="radio" name="level" value="<?= $k ?>" <?= $shareLevel === $k ? 'checked' : '' ?>>
+          <span><strong><?= h($label) ?></strong><span class="muted small"><?= h($desc) ?></span></span>
+        </label>
+      <?php endforeach; ?>
+    </fieldset>
+    <div class="btn-row">
+      <button class="btn">Enregistrer</button>
+      <a class="btn ghost" href="?p=friends"><?= icon('users') ?>Mes amis</a>
+    </div>
+  </form>
+</section>
 
 <div class="grid-2">
   <section class="card">
