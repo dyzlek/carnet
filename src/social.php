@@ -139,6 +139,24 @@ function consume_invite(string $token, int $newUserId): void
     q('INSERT INTO friendships (requester_id, addressee_id, status, created_at) VALUES (?, ?, ?, ?)', [$inviter, $newUserId, 'accepted', now()]);
 }
 
+/**
+ * Un utilisateur DÉJÀ connecté ouvre un lien d'invitation. Renvoie ['status' => ..., 'name' => inviteur] avec status :
+ * 'ok' (amitié créée), 'already' (déjà amis), 'self' (son propre lien), 'invalid' (expiré / utilisé / inconnu).
+ * Le jeton est consommé (comme à l'inscription) : le lien est annoncé « à usage unique », et un lien resté dans
+ * un message ne doit pas pouvoir ajouter n'importe quel compte connecté qui l'ouvre ensuite.
+ */
+function accept_invite(string $token): array
+{
+    $me = uid();
+    $inv = invite_by_token($token);
+    if (!$inv) return ['status' => 'invalid', 'name' => ''];
+    $out = ['status' => 'ok', 'name' => $inv['inviter_name']];
+    if ($inv['inviter_id'] === $me) return ['status' => 'self'] + $out;
+    if (are_friends($inv['inviter_id'], $me)) return ['status' => 'already'] + $out; // pas de consommation inutile
+    consume_invite($token, $me);
+    return are_friends($inv['inviter_id'], $me) ? $out : ['status' => 'invalid', 'name' => ''];
+}
+
 // --- Confidentialité -------------------------------------------------------
 
 /** Niveau de partage de $uid (par défaut le compte connecté) : 'none' | 'summary' (défaut) | 'full'. */
@@ -189,6 +207,10 @@ function social_workouts(string $cond, array $params, int $limit): array
         $r['comments'] = (int)$r['comments'];
         unset($r['my_kudos']);
         $r['prs'] = workout_prs($r);
+        // Séance d'un ami qui ne partage pas en « full » : juste « Record » + valeur, sans l'ancienne marque (détail privé)
+        if ($r['user_id'] !== $me && share_level($r['user_id']) !== 'full') {
+            $r['prs'] = array_map(fn($p) => ['name' => $p['name'], 'what' => 'Record', 'value' => $p['value']], $r['prs']);
+        }
     }
     return $rows;
 }

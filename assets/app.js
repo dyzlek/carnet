@@ -748,6 +748,7 @@ document.addEventListener('change', (e) => {
 document.addEventListener('click', async (e) => {
   const k = e.target.closest('[data-kudos]');
   if (k) {
+    e.preventDefault(); // le bouton est dans un <form method="post"> (repli sans JS) : ici on fait l'AJAX
     if (k.disabled) return;
     k.disabled = true;
     try {

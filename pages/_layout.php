@@ -33,9 +33,9 @@ $msg = flash();
 <meta name="apple-mobile-web-app-title" content="Carnet">
 <script src="assets/theme.js?v=1"></script>
 <link rel="stylesheet" href="assets/fonts.css?v=1">
-<link rel="stylesheet" href="assets/app.css?v=18">
+<link rel="stylesheet" href="assets/app.css?v=19">
 <script src="assets/vendor/chart.umd.min.js?v=4.4.1" defer></script>
-<script src="assets/app.js?v=12" defer></script>
+<script src="assets/app.js?v=13" defer></script>
 </head>
 <body class="page-<?= h($nav) ?><?= $bare ? ' is-bare' : '' ?>">
 <header class="topbar">
