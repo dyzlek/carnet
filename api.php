@@ -146,6 +146,12 @@ try {
             ss_renumber('template', (int)$t['id']);
             json_out(['ok' => true]);
 
+        case 'kudos':
+            // Kudos (ou retrait) sur une séance à moi ou à un ami qui partage
+            $r = toggle_kudos((int)($in['workout'] ?? 0));
+            if ($r['count'] < 0) json_out(['error' => 'Introuvable'], 404);
+            json_out($r);
+
         case 'export':
             // Export des données du compte uniquement (JSON lisible, réimportable plus tard).
             $uid = uid();

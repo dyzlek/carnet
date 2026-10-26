@@ -57,6 +57,10 @@ const ICONS = [
     'zoom-out' => 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4M8 11h6',
     'pause' => 'M7 5h3v14H7zM14 5h3v14h-3z',
     'download' => 'M12 4v11M7 10l5 5 5-5M5 20h14',
+    'users' => 'M16 20v-1.5a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4V20M9.5 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM21 20v-1.5a4 4 0 0 0-3-3.87M15.5 4.13a3.5 3.5 0 0 1 0 6.74',
+    'heart' => 'M12 20.5s-8-4.7-8-10.5A4.5 4.5 0 0 1 12 7.2 4.5 4.5 0 0 1 20 10c0 5.8-8 10.5-8 10.5Z',
+    'message' => 'M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V5Z',
+    'copy' => 'M9 9h10v11H9zM5 15V4h10',
 ];
 
 function icon(string $name, string $class = 'icon'): string
@@ -240,4 +244,58 @@ function muscle_bars(array $stats, int $days, int $limit = 0): string
             . '<span class="mb-val">' . fmt_num($s['sets']) . '</span></a></li>';
     }
     return $html . '</ol>';
+}
+
+/** Pastille ronde avec l'initiale du prénom. */
+function avatar(string $name, string $class = ''): string
+{
+    return '<span class="avatar' . ($class ? ' ' . $class : '') . '" aria-hidden="true">' . h(preg_match('/./us', $name, $m) ? strtoupper($m[0]) : '?') . '</span>';
+}
+
+/** Bouton kudos (AJAX, voir app.js) : aria-pressed = j'ai donné mon kudos. */
+function kudos_button(array $w): string
+{
+    $on = !empty($w['i_kudoed']);
+    return '<button type="button" class="kudos-btn" data-kudos="' . (int)$w['id'] . '" aria-pressed="' . ($on ? 'true' : 'false') . '" aria-label="Kudos">'
+        . icon('heart') . '<span class="kudos-n">' . (int)$w['kudos'] . '</span></button>';
+}
+
+/** Carte d'une séance du fil d'activité (soi ou un ami), telle que renvoyée par feed() / friend_profile(). */
+function workout_card(array $w, bool $showWho = true): string
+{
+    $mine = $w['user_id'] === uid();
+    $href = '?p=friend&workout=' . $w['id'];
+    $html = '<article class="feed-card">';
+    if ($showWho) {
+        $who = $mine ? 'Toi' : $w['user_name'];
+        $html .= '<header class="fc-head">' . avatar($w['user_name'], 'lg')
+            . '<div class="fc-who">' . ($mine ? '<strong>Toi</strong>' : '<a href="?p=friend&id=' . $w['user_id'] . '"><strong>' . h($who) . '</strong></a>')
+            . '<span class="muted small">' . h(ago($w['started_at'])) . ' · ' . h(fmt_date($w['started_at'], true, true)) . '</span></div></header>';
+    } else {
+        $html .= '<p class="muted small fc-date">' . h(ago($w['started_at'])) . ' · ' . h(fmt_date($w['started_at'], true, true)) . '</p>';
+    }
+    $html .= '<h3 class="fc-title"><a href="' . h($href) . '">' . h($w['name']) . '</a></h3>';
+    $stats = [[fmt_duration($w['started_at'], $w['ended_at']), 'durée']];
+    if ($w['sets_done'] > 0) {
+        $stats[] = [(string)$w['exercises'], $w['exercises'] > 1 ? 'exercices' : 'exercice'];
+        $stats[] = [(string)$w['sets_done'], $w['sets_done'] > 1 ? 'séries' : 'série'];
+        if ($w['volume'] > 0) $stats[] = [fmt_num($w['volume'] / 1000, 2) . ' t', 'volume'];
+    }
+    $html .= '<ul class="fc-stats plain">';
+    foreach ($stats as [$v, $l]) $html .= '<li><b class="mono">' . h($v) . '</b> <span class="muted">' . h($l) . '</span></li>';
+    $html .= '</ul>';
+    if ($w['prs']) {
+        $html .= '<ul class="chips fc-prs plain" aria-label="Records battus">';
+        foreach (array_slice($w['prs'], 0, 3) as $p) {
+            $html .= '<li class="chip strong">' . icon('trophy') . h($p['name']) . ' · ' . h($p['value']) . '</li>';
+        }
+        if (count($w['prs']) > 3) $html .= '<li class="chip">+' . (count($w['prs']) - 3) . '</li>';
+        $html .= '</ul>';
+    }
+    $html .= '<footer class="fc-foot">'
+        . ($mine ? '<span class="kudos-static">' . icon('heart') . (int)$w['kudos'] . ' kudos</span>' : kudos_button($w))
+        . '<a class="fc-comments" href="' . h($href) . '#comments">' . icon('message') . (int)$w['comments']
+        . '<span class="sr-only"> commentaire' . ($w['comments'] > 1 ? 's' : '') . '</span></a>'
+        . more_link($href, 'Détail') . '</footer></article>';
+    return $html;
 }

@@ -743,3 +743,44 @@ document.addEventListener('click', (e) => {
 document.addEventListener('change', (e) => {
   if (e.target.matches('[data-autosubmit]')) e.target.form.submit();
 });
+
+// --- Amis : kudos (AJAX) et copie du lien d'invitation ---
+document.addEventListener('click', async (e) => {
+  const k = e.target.closest('[data-kudos]');
+  if (k) {
+    if (k.disabled) return;
+    k.disabled = true;
+    try {
+      const res = await fetch('api.php?action=kudos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.querySelector('meta[name=csrf]')?.content || '' },
+        body: JSON.stringify({ workout: Number(k.dataset.kudos) }),
+      });
+      if (res.status === 401) { location.href = '?p=login'; return; }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) throw new Error(json.error || res.statusText);
+      // même séance affichée à plusieurs endroits : on met tous les boutons à jour
+      document.querySelectorAll('[data-kudos="' + k.dataset.kudos + '"]').forEach((b) => {
+        b.setAttribute('aria-pressed', json.mine ? 'true' : 'false');
+        b.querySelector('.kudos-n').textContent = json.count;
+      });
+    } catch (err) {
+      alert('Kudos impossible : ' + err.message);
+    }
+    k.disabled = false;
+    return;
+  }
+  const c = e.target.closest('[data-copy]');
+  if (c) {
+    const input = document.getElementById(c.dataset.copy);
+    if (!input) return;
+    input.select();
+    let ok = false;
+    try { await navigator.clipboard.writeText(input.value); ok = true; } catch (err) { try { ok = document.execCommand('copy'); } catch (e2) { /* sélection manuelle */ } }
+    const label = c.querySelector('span');
+    if (label) {
+      label.textContent = ok ? 'Copié' : 'Sélectionné';
+      setTimeout(() => { label.textContent = 'Copier'; }, 2000);
+    }
+  }
+});

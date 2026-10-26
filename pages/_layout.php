@@ -6,13 +6,15 @@ $links = [
     'activities' => ['Activités', 'act-run'],
     'templates' => ['Programmes', 'clipboard'],
     'body'      => ['Corps', 'scale'],
+    'friends'   => ['Amis', 'users'],
 ];
-// 5 onglets : Muscles s'ouvre depuis l'accueil, le catalogue d'exercices depuis Programmes
+// 6 onglets : Muscles s'ouvre depuis l'accueil, le catalogue d'exercices depuis Programmes
 $navMap = ['workout' => 'workouts', 'start' => 'workouts', 'muscles' => 'dashboard', 'exercises' => 'templates', 'exercise' => 'templates',
-           'template' => 'templates', 'activity' => 'activities'];
+           'template' => 'templates', 'activity' => 'activities', 'friend' => 'friends', 'feed' => 'friends'];
 $active = $navMap[$nav] ?? $nav;
 $me = current_user();
 $open = $me ? q('SELECT id, name, started_at FROM workouts WHERE ended_at IS NULL AND user_id = ? ORDER BY started_at DESC LIMIT 1', [$me['id']])->fetch() : null;
+$requests = $me ? count(pending_incoming()) : 0; // pastille de l'onglet Amis
 $msg = flash();
 ?><!doctype html>
 <html lang="fr">
@@ -31,9 +33,9 @@ $msg = flash();
 <meta name="apple-mobile-web-app-title" content="Carnet">
 <script src="assets/theme.js?v=1"></script>
 <link rel="stylesheet" href="assets/fonts.css?v=1">
-<link rel="stylesheet" href="assets/app.css?v=17">
+<link rel="stylesheet" href="assets/app.css?v=18">
 <script src="assets/vendor/chart.umd.min.js?v=4.4.1" defer></script>
-<script src="assets/app.js?v=11" defer></script>
+<script src="assets/app.js?v=12" defer></script>
 </head>
 <body class="page-<?= h($nav) ?><?= $bare ? ' is-bare' : '' ?>">
 <header class="topbar">
@@ -43,6 +45,7 @@ $msg = flash();
     <?php foreach ($links as $k => [$label, $ic]): ?>
       <a href="?p=<?= $k ?>" class="<?= $active === $k ? 'is-active' : '' ?>" <?= $active === $k ? 'aria-current="page"' : '' ?>>
         <?= icon($ic) ?><span><?= h($label) ?></span>
+        <?php if ($k === 'friends' && $requests > 0): ?><span class="nav-badge" aria-hidden="true"><?= $requests ?></span><span class="sr-only"><?= $requests ?> demande<?= $requests > 1 ? 's' : '' ?> reçue<?= $requests > 1 ? 's' : '' ?></span><?php endif; ?>
       </a>
     <?php endforeach; ?>
   </nav>
